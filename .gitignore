@@ -1,0 +1,52 @@
+# macOS 系统文件
+.DS_Store
+
+# IDEA 编辑器配置目录
+.idea/
+
+# VSCode 配置目录
+.vscode/
+
+# ----------- Backend -----------
+# 后端编译输出目录
+/backend/target/
+
+# 后端日志文件
+/backend/*.log
+/backend/logs/
+# 其他临时文件
+/backend/*.tmp
+/backend/*.bak
+
+# Maven、Gradle 相关文件（如果需要忽略）
+/backend/*.class
+/backend/*.jar
+/backend/*.war
+
+# ----------- Frontend -----------
+# node_modules 目录
+/frontend/node_modules/
+
+# 打包构建输出目录
+/frontend/dist/
+
+# npm/yarn/pnpm 日志文件
+/frontend/npm-debug.log*
+/frontend/yarn-debug.log*
+/frontend/yarn-error.log*
+/frontend/pnpm-lock.yaml
+
+# 其他临时文件
+/frontend/*.tmp
+/frontend/*.temp
+
+# --------- 全局 ---------
+# 环境变量文件，敏感信息
+.env
+
+# 日志文件
+*.log
+
+# 其他临时文件
+*.tmp
+*.temp
