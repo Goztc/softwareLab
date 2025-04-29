@@ -1,8 +1,10 @@
 # 后端项目
 
-## 项目结构说明
+## 项目说明
 
-### 目录结构
+### 项目结构说明
+
+#### 目录结构
 
 ```bash
 src/main/java/com/itheima/
@@ -42,13 +44,13 @@ src/main/java/com/itheima/
     └── StateValidation.java  # 状态验证器
 ```
 
-## 配置说明
+### 配置说明
 
-### 项目配置
+#### 项目配置
 
 项目使用`Maven`构建。因为后端文件夹不在项目根目录，所以需要先进入后端文件夹，再使用IDEA自动查找`pom.xml`文件来构建。
 
-### 数据库配置
+#### 数据库配置
 
 在`application.yml`中配置：
 
@@ -60,7 +62,7 @@ spring:
     password: 123456
 ```
 
-### Redis配置
+##### Redis配置
 
 在`application.yml`中配置：
 
@@ -72,15 +74,15 @@ spring:
       port: 6379
 ```
 
-## 运行说明
+### 运行说明
 
-### 终端运行
+#### 终端运行
 
 ```bash
 java -jar target/big-event-1.0-SNAPSHOT.jar
 ```
 
-### IDEA 运行
+#### IDEA 运行
 
 在IDEA中，选择`Run` -> `Edit Configurations`，然后选择`Application`，再选择`BigEventApplication`，然后点击`Run`。
 
@@ -92,6 +94,31 @@ java -jar target/big-event-1.0-SNAPSHOT.jar
 4. 确保数据库表使用utf8mb4字符集
 5. 根据实际环境修改数据库和Redis配置
 
-## 接口测试
+### 接口测试
 
 接口测试文件写在`messagetest.http`文件中，现在增加了`auther_token`全局变量，可以实时获取最新的Token。测试其他接口信息前请先登录。
+
+## 更新日志
+
+### 2025-04-29-01
+
+- 新增`THM_file_upload`分支
+- 新增测试文件的auth_token全局变量，可以实时获取最新的Token
+- 新增文件/文件夹管理功能：
+  - 数据库增加`user_folder`表和`user_file`表
+  - `application.yml`增加文件上传路径配置
+  - `user`表增加`secret_key`字段，用于存储用户密钥
+  - 新增文件上传接口，可以上传文件到指定文件夹
+  - 新增文件删除接口，可以删除指定文件
+  - 新增文件夹删除接口，可以删除指定文件夹
+  - 新增文件夹创建接口，可以创建指定文件夹
+  - 新增文件夹查看接口，可以查看指定文件夹下的所有文件和文件夹
+  - 新增文件查看接口，可以查看指定文件的内容
+  - 新增文件夹树查看接口，可以查看指定文件夹下的所有文件和文件夹的树状结构
+- 为所有接口增加测试，在`messagetest.http`文件
+
+TODO:
+
+- 增加文件勾选功能
+- 修改AI对话的API接口
+- 增加接口文档
