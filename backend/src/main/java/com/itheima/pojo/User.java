@@ -21,5 +21,7 @@ public class User {
     @JsonIgnore
     private String password;
     private String userPic;//用户头像地址
+    private String secretKey;  // 用户密钥
     private LocalDateTime createTime;
+    private LocalDateTime updateTime;
 }

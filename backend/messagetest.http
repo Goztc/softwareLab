@@ -46,3 +46,54 @@ Content-Type: application/json
   "new_pwd": "newpassword123",
   "re_pwd": "newpassword123"
 }
+
+### 8. 创建文件夹
+POST http://localhost:8080/api/files/folders
+    ?folderName=testFolder
+Authorization: {{auther_token}}
+
+### 9. 创建二级文件夹
+POST http://localhost:8080/api/files/folders
+    ?folderName=testFolder2
+    &parentId=3
+Authorization: {{auther_token}}
+
+### 10. 上传文件
+POST http://localhost:8080/api/files/upload?folderId=3
+Content-Type: multipart/form-data;boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+Authorization: {{auther_token}}
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="file"; filename="upload_test.txt"
+Content-Type: text/plain
+
+< D:\Dataset\Go_ZTC\upload_test.txt
+------WebKitFormBoundary7MA4YWxkTrZu0gW--
+
+### 11. 查看根目录下的文件夹列表
+GET http://localhost:8080/api/files/folders
+Authorization: {{auther_token}}
+
+### 12. 查看指定文件夹下的文件夹列表
+GET http://localhost:8080/api/files/folders?parentId=3
+Authorization: {{auther_token}}
+
+### 13. 查看根目录下的文件列表
+GET http://localhost:8080/api/files/files
+Authorization: {{auther_token}}
+
+### 14. 查看指定文件夹下的文件列表
+GET http://localhost:8080/api/files/files?folderId=3
+Authorization: {{auther_token}}
+
+### 15. 递归查看根文件夹下的所有文件夹和文件
+GET http://localhost:8080/api/files/tree
+Authorization: {{auther_token}}
+
+### 16. 删除文件
+DELETE http://localhost:8080/api/files/files/6
+Authorization: {{auther_token}}
+
+### 17. 删除文件夹
+DELETE http://localhost:8080/api/files/folders/6
+Authorization: {{auther_token}}

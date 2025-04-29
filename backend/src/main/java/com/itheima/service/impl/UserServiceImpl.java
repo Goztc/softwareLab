@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Map;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -29,10 +30,16 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     public void register(String username, String password) {
+        // 生成用户密钥
+        String secretKey = UUID.randomUUID().toString().replace("-", "");
+        
         User user = new User();
         user.setUsername(username);
         user.setPassword(Md5Util.getMD5String(password));
+        user.setSecretKey(secretKey);
         user.setCreateTime(LocalDateTime.now());
+        user.setUpdateTime(LocalDateTime.now());
+        
         userMapper.insert(user);
     }
 
