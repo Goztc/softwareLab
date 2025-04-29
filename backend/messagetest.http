@@ -6,37 +6,39 @@ POST http://localhost:8080/user/register
 ### 2. 用户登录
 POST http://localhost:8080/user/login
     ?username=testuser
-    &password=newpassword123
+    &password=test123
+
+> {% client.global.set("auther_token", response.body.data) %}
 
 ### 3. 更新用户头像 (使用你提供的图片URL)
 PATCH http://localhost:8080/user/updateAvatar
     ?avatarUrl=https://aircraft-carrier.github.io/images/avatar.jpg
-Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjbGFpbXMiOnsiaWQiOjEsInVzZXJuYW1lIjoidGVzdHVzZXIifSwiZXhwIjoxNzQ1ODMyMDU4fQ.QSCSLtF-y7_1C98IrAbZJnCa83Rc5K6VdiHohI59I6c
+Authorization: {{auther_token}}
 
 ### 4. 创建聊天会话
 POST http://localhost:8080/api/chat/sessions
     ?sessionName=hello
-Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjbGFpbXMiOnsiaWQiOjEsInVzZXJuYW1lIjoidGVzdHVzZXIifSwiZXhwIjoxNzQ1ODMyMDU4fQ.QSCSLtF-y7_1C98IrAbZJnCa83Rc5K6VdiHohI59I6c
+Authorization: {{auther_token}}
 
 ### 5. 发送消息
 POST http://localhost:8080/api/chat/messages
     ?sessionId=1
-Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjbGFpbXMiOnsiaWQiOjEsInVzZXJuYW1lIjoidGVzdHVzZXIifSwiZXhwIjoxNzQ1ODMyMDU4fQ.QSCSLtF-y7_1C98IrAbZJnCa83Rc5K6VdiHohI59I6c
+Authorization: {{auther_token}}
 Content-Type: application/json
 
 {
-  "content": "你好，我是郑书航"
+  "content": "你好，这是一个测试"
 }
 
 ### 6. 获取消息历史
 GET http://localhost:8080/api/chat/messages
     ?sessionId=1
-Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjbGFpbXMiOnsiaWQiOjEsInVzZXJuYW1lIjoidGVzdHVzZXIifSwiZXhwIjoxNzQ1ODMyMDU4fQ.QSCSLtF-y7_1C98IrAbZJnCa83Rc5K6VdiHohI59I6c
+Authorization: {{auther_token}}
 
 
 ### 7. 更新密码
 PATCH http://localhost:8080/user/updatePwd
-Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjbGFpbXMiOnsiaWQiOjEsInVzZXJuYW1lIjoidGVzdHVzZXIifSwiZXhwIjoxNzQ1ODMyMDU4fQ.QSCSLtF-y7_1C98IrAbZJnCa83Rc5K6VdiHohI59I6c
+Authorization: {{auther_token}}
 Content-Type: application/json
 
 {
