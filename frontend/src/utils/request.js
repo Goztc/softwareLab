@@ -11,6 +11,33 @@ const baseURL = '/api';
 // 可以为这个实例单独配置一些参数，这里配置了 baseURL
 const instance = axios.create({ baseURL });
 
+import { useTokenStore } from '@/stores/token.js'
+//添加 Axios 请求拦截器 ，用于在请求发送之前执行某些操作
+instance.interceptors.request.use(
+    (config) => {
+        // 第一个参数是一个回调函数，它在请求发送之前被调用。这个函数接受一个 config 对象作为参数，这个对象包含了请求的所有配置。
+        //请求前的回调
+        //添加token
+        const tokenStore = useTokenStore();
+        // 检查 tokenStore 是否存在 token。
+        if (tokenStore.token) {
+            // 如果存在 token，就将它添加到请求头的 Authorization 字段中。这通常用于 API 身份验证。
+            config.headers.Authorization = tokenStore.token
+        }
+        return config;
+        // 修改后的配置被返回给 Axios，随后请求将继续进行。
+    },
+    (err) => {
+        //请求错误的回调
+        // 如果请求配置过程中发生了错误，它会将错误通过 Promise.reject(err) 传递出去，以便后续的错误处理可以捕获到这个错误。
+        Promise.reject(err)
+    }
+)
+/*
+这段代码的主要目的是在每次发送请求之前，检查用户是否已经登录（通过 token），如果是，就将 token 添加到请求头中，
+以便进行身份验证。当请求发生错误时，也会正常处理错误。这种做法常见于需要认证的 API 请求场景。
+*/
+
 // 为 axios 实例添加响应拦截器，响应拦截器可以在请求返回后对响应数据进行处理
 // 第一个参数是成功响应的处理函数，第二个参数是错误响应的处理函数
 instance.interceptors.response.use(

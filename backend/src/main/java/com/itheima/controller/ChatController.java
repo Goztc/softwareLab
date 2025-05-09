@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/chat")
+@RequestMapping("/chat")
 @RequiredArgsConstructor
 public class ChatController {
     private final ChatService chatService;
@@ -24,6 +24,16 @@ public class ChatController {
         Long userId = ((Integer) userInfo.get("id")).longValue();
 
         ChatSession session = chatService.createSession(userId, sessionName);
+        return Result.success(session);
+    }
+
+    @GetMapping("/sessions")
+    public Result<List<ChatSession>> getSessions() {
+        // 从线程本地获取当前用户ID
+        Map<String, Object> userInfo = ThreadLocalUtil.get();
+        Long userId = ((Integer) userInfo.get("id")).longValue();
+
+        List<ChatSession> session = chatService.getUserSessions(userId);
         return Result.success(session);
     }
 

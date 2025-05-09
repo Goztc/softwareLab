@@ -32,6 +32,10 @@ import '@/assets/css/font-awesome.min.css' // Font Awesome 图标库的样式
 
 // 重复导入 ElementPlus 的样式文件，可删除其中一处以避免重复加载
 import 'element-plus/dist/index.css';
+import { createVuetify } from 'vuetify'
+import 'vuetify/styles'
+const vuetify = createVuetify()
+
 
 // 创建一个新的 Vue 应用实例，传入根组件 App
 const app = createApp(App);
@@ -50,4 +54,5 @@ app.use(store)
 // 将 ElementPlus 组件库应用到 Vue 应用中，并设置语言包为中文
 app.use(ElementPlus, { locale });
 // 将 Vue 应用挂载到 id 为 app 的 DOM 元素上，使得应用在页面上显示
+app.use(vuetify)
 app.mount('#app')

@@ -20,7 +20,7 @@ const hoverEnter = ref(false);
 const isDark = ref(false);
 const scrollTop = ref(false);
 const toolbarDrawer = ref(false);
-
+const router = useRouter();
 const store = useStore();
 
 
@@ -141,14 +141,57 @@ watch(scrollTop, (newScrollTop, oldScrollTop) => {
   // 导航栏显示与颜色
   let toolbarStatus = {
     enter: enter,
-    visible: top,
+    // visible: top,
+    visible: true,
   };
   store.commit('changeToolbarStatus', toolbarStatus);
 });
 
+import useUserInfoStore from '@/stores/userInfo.js'
+import { useTokenStore } from '@/stores/token.js'
+const tokenStore = useTokenStore();
+const userInfoStore = useUserInfoStore();
 
 import { ElMessage, ElMessageBox } from 'element-plus'
-
+const handleCommand = (command)=>{
+    //判断指令
+    if(command === 'logout'){
+        //退出登录
+        ElMessageBox.confirm(
+        '您确认要退出吗?',
+        '温馨提示',
+        {
+            confirmButtonText: '确认',
+            cancelButtonText: '取消',
+            type: 'warning',
+        }
+    )
+        .then(async () => {
+            //退出登录
+            //1.清空pinia中存储的token以及个人信息
+            tokenStore.removeToken()
+            userInfoStore.removeInfo()
+            patientsInfoStore.removeInfo()
+            //2.跳转到登录页面
+            router.push('/login')
+            ElMessage({
+                type: 'success',
+                message: '退出登录成功',
+            })
+            
+        })
+        .catch(() => {
+            ElMessage({
+                type: 'info',
+                message: '用户取消了退出登录',
+            })
+        })
+    }else if(command === 'avatar'){
+        store.commit('changeVisibility', { avatar: !visiblecontrol.value.avatar });
+    }else if(command === 'info'){
+        store.commit('changeVisibility', { info: !visiblecontrol.value.info });
+    }
+}
 </script>
 
 
@@ -161,7 +204,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
         :class="[{ enter: toolbar.enter }, { hoverEnter: hoverEnter && !toolbar.enter }]"
         class="toolbar-content myBetween">
         <div class="toolbar-title">
-          <h2 @click="router.push({ path: '/chat' })"> Aircraft </h2>
+          <h2 @click="router.push({ path: '/login' })"> Aircraft </h2>
         </div>
 
         <!-- 导航列表 -->

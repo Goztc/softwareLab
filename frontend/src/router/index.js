@@ -6,8 +6,8 @@ import { createRouter, createWebHistory } from 'vue-router';
 // 导入组件
 // 导入 Home.vue 组件，该组件通常作为主页显示
 import HomeVue from '@/components/Home.vue';
-// 导入 Gpt.vue 组件，该组件可能用于与 GPT 相关的聊天功能
-import ChatVue from '@/components/Gpt.vue';
+// 导入 gpt.vue 组件，该组件可能用于与 GPT 相关的聊天功能
+import ChatVue from '@/components/gpt.vue';
 import LoginVue from '@/views/Login.vue';
 import UserVue from '@/components/user.vue';
 // 定义路由配置

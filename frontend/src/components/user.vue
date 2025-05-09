@@ -33,6 +33,10 @@
         <!-- content -->
         <div class="page-container-wrap">
           <div class="page-container">
+            <div class="aside-content">
+              <myAside></myAside>
+            </div>
+
             <div class="recent-posts">
               <div class="announcement background-opacity">
                 <i class="fa fa-volume-up" aria-hidden="true"></i>
@@ -67,6 +71,7 @@ import bgImage from '@/assets/bgimg.png';
 import CarAnimation from '@/components/common/CarAnimation.vue';
 import Printer from '@/components/common/printer.vue';
 import { useRouter } from 'vue-router';
+import myAside from '@/components/myAside.vue';
 // 新增 `ResourceCardList` 组件导入
 import ResourceCardList from '@/components/common/ResourceCardList.vue';
 
