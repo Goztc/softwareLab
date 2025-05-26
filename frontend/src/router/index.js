@@ -10,6 +10,7 @@ import HomeVue from '@/components/Home.vue';
 import ChatVue from '@/components/gpt.vue';
 import LoginVue from '@/views/Login.vue';
 import UserVue from '@/components/user.vue';
+import FileExploreVue from '@/components/file.vue'
 // 定义路由配置
 // routes 是一个数组，包含多个路由对象，每个对象代表一个路由规则
 const routes = [
@@ -18,6 +19,7 @@ const routes = [
         path: '/', component: HomeVue, redirect: '/home', children: [
             { path: '/home', component: UserVue },
             { path: '/chat', component: ChatVue },
+            { path: '/file', component: FileExploreVue }
         ]
         // { path: '/', component: LayoutVue, ... }: 这是另一个路由对象，它定义了根路径 / 的路由。这里使用的 LayoutVue 组件通常是一个包含应用布局的主组件。
         // redirect: '/article/manage': 这表示当用户访问根路径 / 时，应用将会自动重定向到 /article/manage 路径。

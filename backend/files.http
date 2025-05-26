@@ -1,0 +1,105 @@
+### 0. 初始化配置
+@host = http://localhost:8080
+@contentType = application/json
+
+### 1. 用户注册
+# 注意：实际生产环境需要更复杂的密码规则
+POST {{host}}/user/register
+    ?username=fileuser
+    &password=123456
+
+### 2. 用户登录 → 获取令牌
+POST {{host}}/user/login
+    ?username=fileuser
+    &password=123456
+
+> {% client.global.set("auther_token", response.body.data) %}
+
+### 3. 创建根文件夹
+POST {{host}}/folders/create
+    ?parentId=0
+    &folderName=我的云盘
+Authorization: {{auther_token}}
+
+> {%
+    client.assert(response.status === 200, "根文件夹创建失败");
+    client.global.set("rootFolderId", response.body.data.id);
+%}
+
+### 4. 创建子文件夹
+POST {{host}}/folders/create
+    ?parentId={{rootFolderId}}
+    &folderName=私人文件
+Authorization: {{auther_token}}
+
+> {%
+    client.assert(response.status === 200, "子文件夹创建失败");
+    client.global.set("subFolderId", response.body.data.id);
+%}
+
+### 5. 文件上传到根目录
+POST {{host}}/files/upload
+    ?folderId={{rootFolderId}}
+Authorization: {{auther_token}}
+Content-Type: multipart/form-data; boundary=boundary
+
+--boundary
+Content-Disposition: form-data; name="file"; filename="test-document.txt"
+
+< ./sample-files/test-document.txt
+--boundary--
+
+> {%
+    client.assert(response.status === 200, "文件上传失败");
+    client.global.set("uploadedFileId", response.body.data.id);
+%}
+
+### 6. 移动文件到子文件夹
+PUT {{host}}/files/{{uploadedFileId}}/move
+    ?targetFolderId={{subFolderId}}
+Authorization: {{auther_token}}
+
+### 7. 获取子文件夹内容
+GET {{host}}/folders/{{subFolderId}}/contents
+Authorization: {{auther_token}}
+
+> {%
+    client.assert(response.status === 200, "获取内容失败");
+    client.assert(response.body.data.files.length > 0, "文件移动失败");
+%}
+
+### 8. 下载移动后的文件
+GET {{host}}/files/{{uploadedFileId}}/download
+Authorization: {{auther_token}}
+
+### 9. 删除测试文件
+DELETE {{host}}/files/{{uploadedFileId}}
+Authorization: {{auther_token}}
+
+### 10. 重命名文件夹
+PUT {{host}}/folders/{{subFolderId}}/rename?newName=good
+Authorization: {{auther_token}}
+
+### 11. 创建文本文件
+POST {{host}}/files/create-text
+Content-Type: application/x-www-form-urlencoded
+Authorization: {{auther_token}}
+
+
+content=这是一个测试文本内容&fileName=测试文件&folderId={{subFolderId}}
+
+
+> {%
+    client.assert(response.status === 200, "文件上传失败");
+    client.global.set("FileId", response.body.data.id);
+%}
+
+### 12.文件重命名
+PUT {{host}}/files/{{FileId}}/rename?newName=新文件名
+Authorization: {{auther_token}}
+
+### 13. 删除测试文件夹
+DELETE {{host}}/folders/{{rootFolderId}}
+Authorization: {{auther_token}}
+
+### 14. 使用阿里云上传 + url 字段

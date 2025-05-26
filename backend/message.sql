@@ -34,3 +34,25 @@ CREATE TABLE `chat_message` (
                                 FOREIGN KEY (`session_id`) REFERENCES `chat_session`(`id`),
                                 FOREIGN KEY (`user_id`) REFERENCES `user`(`id`)
 );
+
+CREATE TABLE `folder` (
+                          `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+                          `parent_id` BIGINT DEFAULT 0 COMMENT '父文件夹ID',
+                          `user_id` BIGINT NOT NULL COMMENT '所属用户ID',
+                          `folder_name` VARCHAR(255) NOT NULL COMMENT '文件夹名称',
+                          `create_time` DATETIME NOT NULL,
+                          `update_time` DATETIME NOT NULL,
+                          FOREIGN KEY (`user_id`) REFERENCES `user`(`id`)
+);
+
+CREATE TABLE `file` (
+                        `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+                        `user_id` BIGINT NOT NULL COMMENT '上传用户ID',
+                        `folder_id` BIGINT DEFAULT 0 COMMENT '所属文件夹ID',
+                        `file_name` VARCHAR(255) NOT NULL COMMENT '原始文件名',
+                        `file_path` VARCHAR(255) NOT NULL COMMENT '存储路径',
+                        `file_type` VARCHAR(50) COMMENT '文件类型',
+                        `upload_time` DATETIME NOT NULL COMMENT '上传时间',
+                        FOREIGN KEY (`user_id`) REFERENCES `user`(`id`),
+                        FOREIGN KEY (`folder_id`) REFERENCES `folder`(`id`)
+);

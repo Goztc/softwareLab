@@ -64,6 +64,8 @@ function createRequestLogger() {
 function isStaticAsset(url: string): boolean {
   const staticPatterns = [
     /^\/src\/assets\//i,
+    /^\/src\/api\//i,
+    /^\/src\/stores\//i,
     /^\/src\/components\//i,
     /^\/node_modules\//i,
     /\.(png|jpg|jpeg|gif|svg|ico|css|js|woff|woff2|ttf|eot)$/i
@@ -138,32 +140,33 @@ export default defineConfig({
           return transformedPath;
         },
         // 添加代理事件监听
-        //   configure: (proxy, options) => {
-        //     proxy.on('proxyReq', (proxyReq, req, res) => {
-        //       console.log('\x1b[32m➡️ 转发到:\x1b[0m', `${options.target}${req.url}`);
-        //     });
+        configure: (proxy, options) => {
+          proxy.on('proxyReq', (proxyReq, req, res) => {
+            console.log('\x1b[32m➡️ 转发到:\x1b[0m', `${options.target}${req.url}`);
+          });
 
-        //     proxy.on('proxyRes', (proxyRes, req, res) => {
-        //       const chunks = [];
-        //       proxyRes.on('data', chunk => chunks.push(chunk));
+          proxy.on('proxyRes', (proxyRes, req, res) => {
+            const chunks = [];
+            proxyRes.on('data', chunk => chunks.push(chunk));
 
-        //       proxyRes.on('end', () => {
-        //         const body = Buffer.concat(chunks).toString('utf8');
+            proxyRes.on('end', () => {
+              const body = Buffer.concat(chunks).toString('utf8');
 
-        //         // 仅打印响应体（自动格式化JSON）
-        //         try {
-        //           const parsedBody = JSON.parse(body);
-        //           console.log('\x1b[36m⬅️ 响应体:\x1b[0m', JSON.stringify(parsedBody, null, 2));
-        //         } catch {
-        //           console.log('\x1b[36m⬅️ 响应体:\x1b[0m', body);
-        //         }
-        //       });
-        //     });
+              // 仅打印响应体（自动格式化JSON）
+              try {
+                const parsedBody = JSON.parse(body);
+                console.log('\x1b[36m⬅️ 响应体:\x1b[0m', JSON.stringify(parsedBody, null, 2));
+              } catch {
+                console.log('\x1b[36m⬅️ 响应体:\x1b[0m', body);
+              }
+            });
+          });
 
-        //     proxy.on('error', err => {
-        //       console.error('\x1b[31m❌ 代理错误:\x1b[0m', err.message);
-        //     });
-        //   }
+          proxy.on('error', err => {
+            console.error('\x1b[31m❌ 代理错误:\x1b[0m', err.message);
+          });
+        }
+        // end
       }
     }
   }

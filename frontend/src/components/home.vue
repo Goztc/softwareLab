@@ -215,6 +215,12 @@ const handleCommand = (command)=>{
                 🏡 <span>首页</span>
               </div>
             </li>
+            
+            <li @click="router.push({ path: '/file' })">
+              <div class="my-menu">
+                🏡 <span>文件管理</span>
+              </div>
+            </li>
 
             <li @click="router.push({ path: '/chat' })">
               <div class="my-menu">
@@ -294,13 +300,19 @@ const handleCommand = (command)=>{
 .toolbar-content {
   width: 100%;
   height: 60px;
-  color: var(--white);
-  /* 固定位置，不随滚动条滚动 */
+  color: var(--toolbarFont);
+  background: white;
   position: fixed;
+  top: 0;
+  left: 0;
   z-index: 100;
-  /* 禁止选中文字 */
   user-select: none;
   transition: all 0.3s ease-in-out;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+#main-container {
+  padding-top: 60px;
 }
 
 .toolbar-content.enter {
