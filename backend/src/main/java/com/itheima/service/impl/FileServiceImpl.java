@@ -39,7 +39,7 @@ public class FileServiceImpl extends ServiceImpl<FileMapper, File> implements Fi
     public File uploadFile(Long userId, Long folderId, MultipartFile file) throws IOException {
         validateFolderAccess(userId, folderId);
 
-        Path storagePath = createStoragePath(folderId);
+        Path storagePath = createStoragePath(userId);
         String fileName = file.getOriginalFilename();
         String uniqueName = generateUniqueFilename(fileName);
         File fileEntity = buildFileEntity(userId, folderId, fileName, storagePath, uniqueName);
@@ -109,7 +109,7 @@ public class FileServiceImpl extends ServiceImpl<FileMapper, File> implements Fi
         // 确保文件名有.txt扩展名
         String finalFileName = fileName.endsWith(".txt") ? fileName : fileName + ".txt";
 
-        Path storagePath = createStoragePath(folderId);
+        Path storagePath = createStoragePath(userId);
         String uniqueName = generateUniqueFilename(finalFileName);
         File fileEntity = buildFileEntity(userId, folderId, finalFileName, storagePath, uniqueName);
 
@@ -127,9 +127,9 @@ public class FileServiceImpl extends ServiceImpl<FileMapper, File> implements Fi
         }
     }
 
-    private Path createStoragePath(Long folderId) throws IOException {
+    private Path createStoragePath(Long userId) throws IOException {
         Path path = Paths.get(storageRoot,
-                "user_" + folderId,
+                "user_" + userId,
                 LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE));
         Files.createDirectories(path);
         return path;

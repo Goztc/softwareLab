@@ -35,8 +35,8 @@ okhttp:
   max-idle-connections: 200
   keep-alive-duration: 300
 
-claude:
+# Flask RAG后端配置
+rag:
   api:
-    key: "sk-H7KgHH0LeaPFSvjJ045447F16f594745A7A1Ed637323326f"
-    url: "https://one.ooo.cool/v1/chat/completions"
-    model: "claude-3-5-sonnet-20240620"
+    url: "http://localhost:5000"
+    timeout: 30

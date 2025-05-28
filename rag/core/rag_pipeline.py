@@ -208,7 +208,7 @@ class RAGPipeline:
     
     def chat(self, question: str, document_path, history: Optional[List] = None, conversation_id: str = "default") -> dict:
         """
-        带历史对话的查询
+        带历史对话的查询 - 真正的对话式RAG实现
         
         Args:
             question: 用户问题
@@ -219,37 +219,129 @@ class RAGPipeline:
         Returns:
             包含答案和来源文档的字典
         """
-        # 获取查询结果
-        result = self.query(question, document_path)
-        
-        # 获取或初始化对话历史
-        if conversation_id not in self.conversation_histories:
-            self.conversation_histories[conversation_id] = []
-        
-        current_history = self.conversation_histories[conversation_id]
-        
-        # 如果传入了history参数，使用它来更新当前历史
-        if history is not None:
-            current_history = history.copy()
+        try:
+            # 获取或初始化对话历史
+            if conversation_id not in self.conversation_histories:
+                self.conversation_histories[conversation_id] = []
+            
+            current_history = self.conversation_histories[conversation_id]
+            
+            # 如果传入了history参数，使用它来更新当前历史
+            if history is not None:
+                current_history = history.copy()
+                self.conversation_histories[conversation_id] = current_history
+            
+            # 加载文档
+            documents = self._load_documents_from_path(document_path)
+            if not documents:
+                return {
+                    "question": question,
+                    "answer": "抱歉，没有找到相关文档。",
+                    "response": "抱歉，没有找到相关文档。",
+                    "sources": [],
+                    "updated_history": current_history,
+                    "conversation_id": conversation_id
+                }
+            
+            print(f"📊 已加载 {len(documents)} 个文档用于对话查询")
+            
+            # 分割文档
+            doc_splits = self.text_splitter.split_documents(documents)
+            print(f"🔪 已将文档分割为 {len(doc_splits)} 个文本块")
+            
+            # 创建向量存储
+            vectorstore = FAISS.from_documents(doc_splits, self.embeddings)
+            print("🗄️  向量数据库创建成功！")
+            
+            # 创建检索器
+            retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
+            
+            # 检索相关文档
+            retrieved_docs = retriever.get_relevant_documents(question)
+            
+            # 构建上下文
+            context = "\n\n".join([doc.page_content for doc in retrieved_docs])
+            
+            # 构建包含历史对话的提示
+            conversation_context = ""
+            if current_history:
+                print(f"💬 使用 {len(current_history)} 轮历史对话")
+                conversation_context = "\n以下是之前的对话历史:\n"
+                for i, exchange in enumerate(current_history[-5:], 1):  # 只使用最近5轮对话
+                    conversation_context += f"第{i}轮对话:\n"
+                    conversation_context += f"用户: {exchange.get('question', '')}\n"
+                    conversation_context += f"助手: {exchange.get('answer', '')}\n\n"
+                conversation_context += "---\n"
+            
+            # 创建增强的提示模板，包含历史对话
+            enhanced_prompt = f"""
+你是一个基于文档的智能助手。请根据检索到的相关文档内容和对话历史来回答用户的问题。
+
+{conversation_context}
+
+相关文档内容:
+{context}
+
+当前用户问题: {question}
+
+请根据上述信息回答用户问题。如果问题涉及之前的对话内容，请结合历史对话来回答。如果文档内容不足以回答问题，请如实说明。
+
+回答:"""
+            
+            # 直接调用LLM生成回答
+            print("🤖 正在生成带历史对话的回答...")
+            response = self.llm.invoke(enhanced_prompt)
+            
+            # 提取回答内容
+            if hasattr(response, 'content'):
+                answer = response.content
+            else:
+                answer = str(response)
+            
+            # 提取源文档信息
+            sources = []
+            source_files = []
+            for doc in retrieved_docs:
+                source_info = doc.metadata.get("source", "Unknown")
+                if source_info not in source_files:
+                    source_files.append(source_info)
+                    sources.append({
+                        "content": doc.page_content,
+                        "source": source_info
+                    })
+            
+            # 添加当前对话到历史
+            current_exchange = {
+                "question": question,
+                "answer": answer,
+                "sources": sources,
+                "timestamp": __import__('datetime').datetime.now().isoformat()
+            }
+            
+            current_history.append(current_exchange)
             self.conversation_histories[conversation_id] = current_history
-        
-        # 添加当前对话到历史
-        current_exchange = {
-            "question": question,
-            "answer": result['answer'],
-            "sources": result['sources'],
-            "timestamp": __import__('datetime').datetime.now().isoformat()
-        }
-        
-        current_history.append(current_exchange)
-        self.conversation_histories[conversation_id] = current_history
-        
-        # 为了兼容测试客户端，添加response字段
-        result['response'] = result['answer']
-        result['updated_history'] = current_history.copy()
-        result['conversation_id'] = conversation_id
-        
-        return result
+            
+            print(f"✅ 对话回答生成成功，历史记录已更新 (共{len(current_history)}轮)")
+            
+            return {
+                "question": question,
+                "answer": answer,
+                "response": answer,  # 为了兼容性
+                "sources": sources,
+                "updated_history": current_history.copy(),
+                "conversation_id": conversation_id
+            }
+            
+        except Exception as e:
+            print(f"❌ 对话查询过程中发生错误: {e}")
+            return {
+                "question": question,
+                "answer": f"对话查询过程中发生错误: {str(e)}",
+                "response": f"对话查询过程中发生错误: {str(e)}",
+                "sources": [],
+                "updated_history": current_history,
+                "conversation_id": conversation_id
+            }
     
     def search(self, query: str, document_path, top_k: int = 5) -> dict:
         """

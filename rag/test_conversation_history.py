@@ -30,14 +30,14 @@ def test_conversation_history():
         
         # 第一轮对话
         print("\n💬 第一轮对话...")
-        result1 = rag.chat("什么是机器学习？", test_path, conversation_id=conversation_id)
+        result1 = rag.chat("记住，我喜欢猫", test_path, conversation_id=conversation_id)
         print(f"问题1: {result1['question']}")
         print(f"回答1: {result1['answer'][:100]}...")
         print(f"对话历史长度: {len(result1['updated_history'])}")
         
         # 第二轮对话
         print("\n💬 第二轮对话...")
-        result2 = rag.chat("深度学习和机器学习有什么关系？", test_path, 
+        result2 = rag.chat("我喜欢什么？", test_path, 
                           history=result1['updated_history'], conversation_id=conversation_id)
         print(f"问题2: {result2['question']}")
         print(f"回答2: {result2['answer'][:100]}...")
