@@ -38,6 +38,36 @@ def health_check():
         'message': 'RAG系统运行正常'
     })
 
+@app.route('/warmup', methods=['POST'])
+def warmup_pipeline():
+    """预热RAG流水线接口"""
+    try:
+        logger.info("开始预热RAG流水线...")
+        start_time = datetime.utcnow()
+        
+        # 初始化RAG流水线
+        pipeline = get_rag_pipeline()
+        
+        # 预热embedding模型
+        test_text = "这是一个测试文本用于预热embedding模型"
+        pipeline.embeddings.embed_query(test_text)
+        
+        end_time = datetime.utcnow()
+        duration = (end_time - start_time).total_seconds()
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'RAG流水线预热完成',
+            'warmup_duration_seconds': round(duration, 2),
+            'timestamp': end_time.isoformat()
+        })
+    except Exception as e:
+        logger.error(f"预热失败: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'error': f'预热失败: {str(e)}'
+        }), 500
+
 @app.route('/query', methods=['POST'])
 def query_documents():
     """查询文档接口"""
@@ -218,6 +248,14 @@ def clear_conversation(conversation_id):
         logger.error(f"Clear conversation error: {str(e)}")
         return jsonify({"error": f"清除历史失败: {str(e)}"}), 500
 
+@app.errorhandler(404)
+def not_found(error):
+    return jsonify({"error": "接口不存在"}), 404
+
+@app.errorhandler(500)
+def internal_error(error):
+    return jsonify({"error": "内部服务器错误"}), 500
+
 @app.route('/stats', methods=['GET'])
 def get_stats():
     """获取系统统计信息"""
@@ -229,16 +267,119 @@ def get_stats():
         logger.error(f"Get stats error: {str(e)}")
         return jsonify({"error": f"获取统计信息失败: {str(e)}"}), 500
 
-@app.errorhandler(404)
-def not_found(error):
-    return jsonify({"error": "接口不存在"}), 404
+# 向量存储管理API
+@app.route('/vectorstores', methods=['GET'])
+def list_vectorstores():
+    """列出所有持久化的向量存储"""
+    try:
+        pipeline = get_rag_pipeline()
+        result = pipeline.list_vectorstores()
+        return jsonify(result), 200
+    except Exception as e:
+        logger.error(f"List vectorstores error: {str(e)}")
+        return jsonify({"error": f"列出向量存储失败: {str(e)}"}), 500
 
-@app.errorhandler(500)
-def internal_error(error):
-    return jsonify({"error": "内部服务器错误"}), 500
+@app.route('/vectorstores', methods=['POST'])
+def create_vectorstore():
+    """构建并保存向量存储"""
+    try:
+        data = request.get_json()
+        if not data or 'document_path' not in data:
+            return jsonify({"error": "缺少document_path参数"}), 400
+        
+        document_path = data['document_path']
+        force_rebuild = data.get('force_rebuild', False)
+        
+        # 处理文档路径
+        full_document_paths = _process_document_paths(document_path)
+        if not full_document_paths:
+            return jsonify({'error': '文档路径不能为空或无效'}), 400
+        
+        pipeline = get_rag_pipeline()
+        result = pipeline.save_vectorstore(full_document_paths[0], force_rebuild)
+        
+        if result['status'] == 'error':
+            return jsonify(result), 500
+        elif result['status'] == 'exists':
+            return jsonify(result), 200
+        else:
+            return jsonify(result), 201
+        
+    except Exception as e:
+        logger.error(f"Create vectorstore error: {str(e)}")
+        return jsonify({"error": f"创建向量存储失败: {str(e)}"}), 500
+
+@app.route('/vectorstores/rebuild', methods=['POST'])
+def rebuild_vectorstore():
+    """重新构建向量存储"""
+    try:
+        data = request.get_json()
+        if not data or 'document_path' not in data:
+            return jsonify({"error": "缺少document_path参数"}), 400
+        
+        document_path = data['document_path']
+        
+        # 处理文档路径
+        full_document_paths = _process_document_paths(document_path)
+        if not full_document_paths:
+            return jsonify({'error': '文档路径不能为空或无效'}), 400
+        
+        pipeline = get_rag_pipeline()
+        # 强制重新构建
+        result = pipeline.save_vectorstore(full_document_paths[0], force_rebuild=True)
+        
+        if result['status'] == 'error':
+            return jsonify(result), 500
+        else:
+            return jsonify(result), 200
+        
+    except Exception as e:
+        logger.error(f"Rebuild vectorstore error: {str(e)}")
+        return jsonify({"error": f"重新构建向量存储失败: {str(e)}"}), 500
+
+@app.route('/vectorstores/clear-cache', methods=['POST'])
+def clear_vectorstore_cache():
+    """清除向量存储缓存"""
+    try:
+        data = request.get_json()
+        document_path = data.get('document_path') if data else None
+        
+        pipeline = get_rag_pipeline()
+        
+        if document_path:
+            # 处理文档路径
+            full_document_paths = _process_document_paths(document_path)
+            if full_document_paths:
+                pipeline.clear_cache(full_document_paths[0])
+                return jsonify({"message": f"已清除 {document_path} 的缓存"}), 200
+            else:
+                return jsonify({'error': '文档路径无效'}), 400
+        else:
+            # 清除所有缓存
+            pipeline.clear_cache()
+            return jsonify({"message": "已清除所有缓存"}), 200
+        
+    except Exception as e:
+        logger.error(f"Clear cache error: {str(e)}")
+        return jsonify({"error": f"清除缓存失败: {str(e)}"}), 500
 
 if __name__ == '__main__':
     try:
+        # 可选的启动时初始化
+        if config.STARTUP_INIT_RAG:
+            logger.info("启动时初始化RAG流水线...")
+            try:
+                pipeline = get_rag_pipeline()
+                if config.WARMUP_ON_STARTUP:
+                    logger.info("进行预热...")
+                    test_text = "启动预热测试文本"
+                    pipeline.embeddings.embed_query(test_text)
+                    logger.info("✅ RAG流水线启动初始化完成")
+                else:
+                    logger.info("✅ RAG流水线启动初始化完成（未预热）")
+            except Exception as e:
+                logger.warning(f"⚠️  启动初始化失败，将使用延迟初始化: {str(e)}")
+        
         app.run(
             host=config.FLASK_HOST,
             port=config.FLASK_PORT,

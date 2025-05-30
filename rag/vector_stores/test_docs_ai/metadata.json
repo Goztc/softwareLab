@@ -1,0 +1,7 @@
+{
+  "document_path": "test_docs/ai",
+  "document_count": 2,
+  "chunk_count": 7,
+  "created_at": 1748508569.6404774,
+  "embedding_model": "E:\\Project\\00Git\\softwareLab\\rag\\all-MiniLM-L6-v2"
+}
