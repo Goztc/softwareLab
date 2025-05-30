@@ -60,7 +60,7 @@ instance.interceptors.response.use(
     // 错误响应的处理函数，当请求过程中出现错误（如网络错误、超时等）时会执行此函数
     error => {
         //判断响应状态码,如果为401,则证明未登录,提示请登录,并跳转到登录页面
-        if (err.response.status === 401) {
+        if (error.response && error.response.status === 401) {
             ElMessage.error('请先登录')
             router.push('/login')
         } else {
