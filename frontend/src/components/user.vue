@@ -38,15 +38,17 @@
             </div>
 
             <div class="recent-posts">
-              <div class="announcement background-opacity">
-                <i class="fa fa-volume-up" aria-hidden="true"></i>
+              <div class="container">
+
                 <div>
-                  hhhhhhhhhhhhhhhhhh
+                  <AvatarUploader v-if="visible.avatar" />
                 </div>
+                <div>
+                  <UserInfoForm v-if="visible.info" />
+                </div>
+
               </div>
-              <div style="padding: 0 20px">
-                <CarAnimation />
-              </div>
+
               <div>
                 <ResourceCardList :resourcePathList="resourcePathList" @clickResourcePath="handleResourceClick" />
               </div>
@@ -68,20 +70,25 @@ import myFooter from '@/components/common/myFooter.vue';
 import loader from '@/components/common/loader.vue';
 import zombie from '@/components/common/zombie.vue';
 import bgImage from '@/assets/bgimg.png';
-import CarAnimation from '@/components/common/CarAnimation.vue';
 import Printer from '@/components/common/printer.vue';
 import { useRouter } from 'vue-router';
 import myAside from '@/components/myAside.vue';
 // 新增 `ResourceCardList` 组件导入
 import ResourceCardList from '@/components/common/ResourceCardList.vue';
-
+import AvatarUploader from '@/components/common/AvatarUploader.vue';
+import UserInfoForm from '@/components/common/UserInfoForm.vue';
 const loading = ref(false);
 const router = useRouter();
+
+import { useStore } from 'vuex';                          // 5-30
+const store = useStore();                                 // 5-30
+const visible = computed(() => store.state.visible);      // 5-30
+
 // 模拟 webTitle 数据
-const webTitle = ref('心灵捕手——在乎每颗心'.split(''));
+const webTitle = ref('hhhhhhhhhh'.split(''));
 // printerInfo 数据
 const printerInfo = ref({
-  content: '多模态与单样本双方法切割全心脏，MedicalSeg-Vnet检测心肌瘢痕'
+  content: '幸福快乐每一天'
 });
 // 在组件挂载时调用函数
 onMounted(() => {

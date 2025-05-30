@@ -3,16 +3,11 @@ import { ref, onMounted, onUnmounted, computed, watch } from 'vue';
 import { useStore } from 'vuex';
 import { useRouter } from 'vue-router';
 import {
-  Management,
-  Promotion,
-  UserFilled,
   User,
   Crop,
-  EditPen,
   SwitchButton,
-  CaretBottom
 } from '@element-plus/icons-vue'
-import avatar from '@/assets/default.png'
+
 
 // # 变量声明
 const toolButton = ref(false);
@@ -25,7 +20,7 @@ const store = useStore();
 
 
 const toolbar = computed(() => store.state.toolbar);
-
+const visiblecontrol = computed(() => store.state.visible);
 import Sider from '@/components/common/sider.vue'
 // # function
 // 改变颜色
@@ -171,7 +166,6 @@ const handleCommand = (command)=>{
             //1.清空pinia中存储的token以及个人信息
             tokenStore.removeToken()
             userInfoStore.removeInfo()
-            patientsInfoStore.removeInfo()
             //2.跳转到登录页面
             router.push('/login')
             ElMessage({
@@ -187,8 +181,16 @@ const handleCommand = (command)=>{
             })
         })
     }else if(command === 'avatar'){
+        ElMessage({
+            type: 'success',
+            message: 'avatar',
+        })
         store.commit('changeVisibility', { avatar: !visiblecontrol.value.avatar });
     }else if(command === 'info'){
+        ElMessage({
+            type: 'success',
+            message: 'info',
+        })
         store.commit('changeVisibility', { info: !visiblecontrol.value.info });
     }
 }

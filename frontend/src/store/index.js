@@ -11,7 +11,6 @@ const store = createStore({
             avatar: false,
             info: false,
             resetPassword: false,
-            segwindows: false,
             wenxin: false,
         }
     },

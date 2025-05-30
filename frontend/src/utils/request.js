@@ -37,7 +37,7 @@ instance.interceptors.request.use(
 这段代码的主要目的是在每次发送请求之前，检查用户是否已经登录（通过 token），如果是，就将 token 添加到请求头中，
 以便进行身份验证。当请求发生错误时，也会正常处理错误。这种做法常见于需要认证的 API 请求场景。
 */
-
+import router from '@/router'  // '@/router' 将自动导入 `router/index.js` 中的默认导出 
 // 为 axios 实例添加响应拦截器，响应拦截器可以在请求返回后对响应数据进行处理
 // 第一个参数是成功响应的处理函数，第二个参数是错误响应的处理函数
 instance.interceptors.response.use(
@@ -59,9 +59,13 @@ instance.interceptors.response.use(
     },
     // 错误响应的处理函数，当请求过程中出现错误（如网络错误、超时等）时会执行此函数
     error => {
-        // 使用 ElMessage 组件显示错误信息，优先使用错误对象的 message 字段
-        // 如果 message 字段不存在，则显示默认的错误信息 '网络异常'
-        ElMessage.error(error.message || '网络异常');
+        //判断响应状态码,如果为401,则证明未登录,提示请登录,并跳转到登录页面
+        if (err.response.status === 401) {
+            ElMessage.error('请先登录')
+            router.push('/login')
+        } else {
+            ElMessage.error('服务异常')
+        }
         // 返回一个被拒绝的 Promise，将错误对象传递给调用者
         return Promise.reject(error);
     }
