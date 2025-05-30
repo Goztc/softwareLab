@@ -37,6 +37,11 @@ okhttp:
 
 # Flask RAG后端配置
 rag:
-  api:
-    url: "http://localhost:5000"
-    timeout: 30
+  enabled: true  # 是否启用RAG功能
+  base-url: "http://localhost:5000"  # RAG后端服务地址
+  timeout-seconds: 30  # 请求超时时间（秒）
+  connection-timeout: 5000  # 连接超时时间（毫秒）
+  read-timeout: 30000  # 读取超时时间（毫秒）
+  retry:
+    max-attempts: 3  # 最大重试次数
+    delay: 1000  # 重试间隔（毫秒）

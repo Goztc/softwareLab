@@ -55,4 +55,8 @@ GENERATION_CONFIG = {
     "max_tokens": 1024,
     "top_p": 0.9,
     "stream": False
-} 
+}
+
+# RAG流水线启动配置
+STARTUP_INIT_RAG = os.getenv("STARTUP_INIT_RAG", "false").lower() == "true"  # 是否在启动时初始化RAG流水线
+WARMUP_ON_STARTUP = os.getenv("WARMUP_ON_STARTUP", "true").lower() == "true"  # 是否在启动时进行预热 
