@@ -97,6 +97,27 @@
                       <div class="name">{{ folder.folderName }}</div>
                       <div class="meta">--</div>
                     </div>
+                    <div class="card-actions">
+                      <el-tooltip content="重命名" placement="top">
+                        <el-button 
+                          size="small" 
+                          @click.stop="renameItem(folder)"
+                          circle
+                        >
+                          <el-icon><Edit /></el-icon>
+                        </el-button>
+                      </el-tooltip>
+                      <el-tooltip content="删除" placement="top">
+                        <el-button 
+                          size="small" 
+                          @click.stop="deleteFolder(folder.id)"
+                          circle
+                          type="danger"
+                        >
+                          <el-icon><Delete /></el-icon>
+                        </el-button>
+                      </el-tooltip>
+                    </div>
                   </el-card>
                 </div>
               </div>
@@ -337,6 +358,42 @@ const deleteFile = async (fileId: number) => {
     ElMessage.success('文件删除成功')
   } catch (error) {
     // 用户取消删除
+  }
+}
+
+// 删除文件夹
+const deleteFolder = async (folderId: number) => {
+  try {
+    // 检查是否为根文件夹或当前文件夹
+    const isRootFolder = fileStore.folderTree.some(folder => folder.id === folderId)
+    const isCurrentFolder = fileStore.currentFolderId === folderId
+    
+    if (isCurrentFolder) {
+      ElMessage.warning('不能删除当前所在的文件夹')
+      return
+    }
+    
+    const confirmText = isRootFolder 
+      ? '确定要删除这个根文件夹吗？这将删除其中的所有内容！'
+      : '确定要删除这个文件夹吗？删除后文件夹内的所有内容都将丢失！'
+    
+    await ElMessageBox.confirm(
+      confirmText,
+      '警告', 
+      {
+        confirmButtonText: '确定删除',
+        cancelButtonText: '取消',
+        type: 'error',
+        dangerouslyUseHTMLString: true
+      }
+    )
+    
+    await fileStore.deleteFolder(folderId)
+    ElMessage.success('文件夹删除成功')
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error('文件夹删除失败')
+    }
   }
 }
 
@@ -627,6 +684,18 @@ const formatFileSize = (bytes?: number) => {
   
   .el-button {
     padding: 6px;
+    
+    &.is-circle.el-button--danger {
+      background-color: #fef0f0;
+      border-color: #fbc4c4;
+      color: #f56c6c;
+      
+      &:hover {
+        background-color: #f56c6c;
+        border-color: #f56c6c;
+        color: white;
+      }
+    }
   }
 }
 

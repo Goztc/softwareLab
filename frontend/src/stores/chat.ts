@@ -2,7 +2,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { ChatSession, ChatMessage } from '@/types'
-import { createSession, sendMessage, getMessageHistory, getSessions } from '@/api/chat'
+import { createSession, sendMessage, getMessageHistory, getSessions, renameSession, deleteSession, clearSessionHistory } from '@/api/chat'
 import { marked } from 'marked'
 
 export const useChatStore = defineStore('chat', () => {
@@ -132,6 +132,74 @@ export const useChatStore = defineStore('chat', () => {
         }
     }
 
+    // 重命名会话
+    const renameSessionById = async (sessionId: number, newName: string) => {
+        loading.value = true
+        error.value = null
+        try {
+            const { code, data, message } = await renameSession(sessionId, newName)
+            if (code !== 0) throw new Error(message)
+            
+            // 更新本地会话数据
+            const sessionIndex = sessions.value.findIndex(s => s.id === sessionId)
+            if (sessionIndex !== -1) {
+                sessions.value[sessionIndex] = { ...sessions.value[sessionIndex], sessionName: newName }
+            }
+            return data
+        } catch (err) {
+            handleError(err, '重命名会话失败')
+        } finally {
+            loading.value = false
+        }
+    }
+
+    // 删除会话
+    const deleteSessionById = async (sessionId: number) => {
+        loading.value = true
+        error.value = null
+        try {
+            const { code, message } = await deleteSession(sessionId)
+            if (code !== 0) throw new Error(message)
+            
+            // 从本地删除会话
+            sessions.value = sessions.value.filter(s => s.id !== sessionId)
+            
+            // 如果删除的是当前会话，切换到第一个会话或清空
+            if (currentSessionId.value === sessionId) {
+                if (sessions.value.length > 0) {
+                    currentSessionId.value = sessions.value[0].id
+                    await loadMessageHistory(sessions.value[0].id)
+                } else {
+                    currentSessionId.value = null
+                    messages.value = []
+                }
+            }
+        } catch (err) {
+            handleError(err, '删除会话失败')
+        } finally {
+            loading.value = false
+        }
+    }
+
+    // 清除会话历史
+    const clearHistory = async (sessionId: number) => {
+        loading.value = true
+        error.value = null
+        try {
+            const { code, message } = await clearSessionHistory(sessionId)
+            if (code !== 0) throw new Error(message)
+            
+            // 如果是当前会话，清空消息
+            if (currentSessionId.value === sessionId) {
+                messages.value = []
+            }
+        } catch (err) {
+            handleError(err, '清除会话历史失败')
+        } finally {
+            loading.value = false
+        }
+    }
+
     return {
         currentUserId,
         sessions,
@@ -142,6 +210,9 @@ export const useChatStore = defineStore('chat', () => {
         createNewSession,
         sendNewMessage,
         loadMessageHistory,
-        loadSessions
+        loadSessions,
+        renameSessionById,
+        deleteSessionById,
+        clearHistory
     }
 })
