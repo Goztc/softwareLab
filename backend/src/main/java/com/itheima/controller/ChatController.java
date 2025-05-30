@@ -45,16 +45,78 @@ public class ChatController {
         Map<String, Object> userInfo = ThreadLocalUtil.get();
         Long userId = ((Integer) userInfo.get("id")).longValue();
         String content = params.get("content");
-        if (content == null) {
-            return Result.error("消息为空");
+        if (content == null || content.trim().isEmpty()) {
+            return Result.error("消息内容不能为空");
         }
-        ChatMessage message = chatService.sendMessage(sessionId, userId, content);
-        return Result.success(message);
+        try {
+            ChatMessage message = chatService.sendMessage(sessionId, userId, content);
+            return Result.success(message);
+        } catch (RuntimeException e) {
+            return Result.error(e.getMessage());
+        }
     }
 
     @GetMapping("/messages")
     public Result<List<ChatMessage>> getMessageHistory(@RequestParam Long sessionId) {
         List<ChatMessage> messages = chatService.getMessageHistory(sessionId);
         return Result.success(messages);
+    }
+
+    /**
+     * 删除会话
+     */
+    @DeleteMapping("/sessions/{sessionId}")
+    public Result<String> deleteSession(@PathVariable Long sessionId) {
+        boolean success = chatService.deleteSession(sessionId);
+        if (success) {
+            return Result.success("会话删除成功");
+        } else {
+            return Result.error("会话删除失败");
+        }
+    }
+
+    /**
+     * 重命名会话
+     */
+    @PutMapping("/sessions/{sessionId}")
+    public Result<ChatSession> renameSession(
+            @PathVariable Long sessionId,
+            @RequestBody Map<String, String> params) {
+        String newName = params.get("sessionName");
+        if (newName == null || newName.trim().isEmpty()) {
+            return Result.error("会话名称不能为空");
+        }
+        ChatSession session = chatService.renameSession(sessionId, newName);
+        return Result.success(session);
+    }
+
+    /**
+     * 清除会话的聊天历史
+     */
+    @DeleteMapping("/sessions/{sessionId}/history")
+    public Result<String> clearSessionHistory(@PathVariable Long sessionId) {
+        // 从线程本地获取当前用户ID
+        Map<String, Object> userInfo = ThreadLocalUtil.get();
+        Long userId = ((Integer) userInfo.get("id")).longValue();
+        
+        boolean success = chatService.clearSessionHistory(sessionId, userId);
+        if (success) {
+            return Result.success("会话历史清除成功");
+        } else {
+            return Result.error("会话历史清除失败，请检查会话是否存在");
+        }
+    }
+
+    /**
+     * 获取指定消息详情
+     */
+    @GetMapping("/messages/{messageId}")
+    public Result<ChatMessage> getMessageById(@PathVariable Long messageId) {
+        ChatMessage message = chatService.getMessageById(messageId);
+        if (message != null) {
+            return Result.success(message);
+        } else {
+            return Result.error("消息不存在");
+        }
     }
 }

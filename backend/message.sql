@@ -1,5 +1,5 @@
 -- 创建数据库
-create database go_ztc;
+create database go_ztc CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- 使用数据库
 use go_ztc;
@@ -13,7 +13,7 @@ CREATE TABLE `user` (
                         `email`       varchar(128) default '' null comment '邮箱',
                         `user_pic`    varchar(128) default '' null comment '头像',
                         `create_time` DATETIME NOT NULL
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;      
 
 CREATE TABLE `chat_session` (
                                 `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -22,7 +22,7 @@ CREATE TABLE `chat_session` (
                                 `create_time` DATETIME NOT NULL,
                                 `update_time` DATETIME NOT NULL,
                                 FOREIGN KEY (`user_id`) REFERENCES `user`(`id`)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE `chat_message` (
                                 `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -33,7 +33,7 @@ CREATE TABLE `chat_message` (
                                 `create_time` DATETIME NOT NULL,
                                 FOREIGN KEY (`session_id`) REFERENCES `chat_session`(`id`),
                                 FOREIGN KEY (`user_id`) REFERENCES `user`(`id`)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE `folder` (
                           `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -43,7 +43,7 @@ CREATE TABLE `folder` (
                           `create_time` DATETIME NOT NULL,
                           `update_time` DATETIME NOT NULL,
                           FOREIGN KEY (`user_id`) REFERENCES `user`(`id`)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE `file` (
                         `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -55,4 +55,4 @@ CREATE TABLE `file` (
                         `upload_time` DATETIME NOT NULL COMMENT '上传时间',
                         FOREIGN KEY (`user_id`) REFERENCES `user`(`id`),
                         FOREIGN KEY (`folder_id`) REFERENCES `folder`(`id`)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

@@ -4,19 +4,19 @@
 
 ### 1. 用户注册
 # 注意：实际生产环境需要更复杂的密码规则
-POST {{host}}/user/register
+POST http://localhost:8080/user/register
     ?username=fileuser
     &password=123456
 
 ### 2. 用户登录 → 获取令牌
-POST {{host}}/user/login
+POST http://localhost:8080/user/login
     ?username=fileuser
     &password=123456
 
 > {% client.global.set("auther_token", response.body.data) %}
 
 ### 3. 创建根文件夹
-POST {{host}}/folders/create
+POST http://localhost:8080/folders/create
     ?parentId=0
     &folderName=我的云盘
 Authorization: {{auther_token}}
@@ -27,7 +27,7 @@ Authorization: {{auther_token}}
 %}
 
 ### 4. 创建子文件夹
-POST {{host}}/folders/create
+POST http://localhost:8080/folders/create
     ?parentId={{rootFolderId}}
     &folderName=私人文件
 Authorization: {{auther_token}}
@@ -38,7 +38,7 @@ Authorization: {{auther_token}}
 %}
 
 ### 5. 文件上传到根目录
-POST {{host}}/files/upload
+POST http://localhost:8080/files/upload
     ?folderId={{rootFolderId}}
 Authorization: {{auther_token}}
 Content-Type: multipart/form-data; boundary=boundary
@@ -55,12 +55,12 @@ Content-Disposition: form-data; name="file"; filename="test-document.txt"
 %}
 
 ### 6. 移动文件到子文件夹
-PUT {{host}}/files/{{uploadedFileId}}/move
+PUT http://localhost:8080/files/{{uploadedFileId}}/move
     ?targetFolderId={{subFolderId}}
 Authorization: {{auther_token}}
 
 ### 7. 获取子文件夹内容
-GET {{host}}/folders/{{subFolderId}}/contents
+GET http://localhost:8080/folders/{{subFolderId}}/contents
 Authorization: {{auther_token}}
 
 > {%
@@ -69,19 +69,19 @@ Authorization: {{auther_token}}
 %}
 
 ### 8. 下载移动后的文件
-GET {{host}}/files/{{uploadedFileId}}/download
+GET http://localhost:8080/files/{{uploadedFileId}}/download
 Authorization: {{auther_token}}
 
 ### 9. 删除测试文件
-DELETE {{host}}/files/{{uploadedFileId}}
+DELETE http://localhost:8080/files/{{uploadedFileId}}
 Authorization: {{auther_token}}
 
 ### 10. 重命名文件夹
-PUT {{host}}/folders/{{subFolderId}}/rename?newName=good
+PUT http://localhost:8080/folders/{{subFolderId}}/rename?newName=good
 Authorization: {{auther_token}}
 
 ### 11. 创建文本文件
-POST {{host}}/files/create-text
+POST http://localhost:8080/files/create-text
 Content-Type: application/x-www-form-urlencoded
 Authorization: {{auther_token}}
 
@@ -95,11 +95,11 @@ content=这是一个测试文本内容&fileName=测试文件&folderId={{subFolde
 %}
 
 ### 12.文件重命名
-PUT {{host}}/files/{{FileId}}/rename?newName=新文件名
+PUT http://localhost:8080/files/{{FileId}}/rename?newName=新文件名
 Authorization: {{auther_token}}
 
 ### 13. 删除测试文件夹
-DELETE {{host}}/folders/{{rootFolderId}}
+DELETE http://localhost:8080/folders/{{rootFolderId}}
 Authorization: {{auther_token}}
 
 ### 14. 使用阿里云上传 + url 字段

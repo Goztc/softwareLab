@@ -72,4 +72,13 @@ public interface ChatService {
      * @return 消息对象
      */
     ChatMessage getMessageById(Long messageId);
+
+    /**
+     * 清除会话的聊天历史
+     *
+     * @param sessionId 会话ID
+     * @param userId    用户ID
+     * @return 是否清除成功
+     */
+    boolean clearSessionHistory(Long sessionId, Long userId);
 }
