@@ -87,7 +87,7 @@ spring:
 
 数据库使用mysql实现。得自己下载个mysql，然后配置好用户名密码，创建好数据库。
 
-创建数据库的sql语句在`messagetest.sql`文件中，一个一个执行即可。
+创建数据库的sql语句在`message.sql`文件中，一个一个执行即可。
 
 ##### Redis配置
 
@@ -103,26 +103,27 @@ spring:
 
 需要自己下载一个redis，全默认就行。
 
-##### 文件上传路径配置
-
-在`application.yml`中配置：
-
-```yaml
-file:
-  upload-path: E:\\file
-```
-
 ### 运行说明
 
 #### 终端运行
 
-```bash
-java -jar target/big-event-1.0-SNAPSHOT.jar
-```
+[//]: # (```bash)
+
+[//]: # (java -jar target/big-event-1.0-SNAPSHOT.jar)
+
+[//]: # (```)
 
 #### IDEA 运行
 
 在IDEA中，选择`Run` -> `Edit Configurations`，然后选择`Application`，再选择`BigEventApplication`，然后点击`Run`。
+
+#### Redis运行
+额外开启一个终端
+```bash
+ cd D:\Environment\Redis-8.0.2-Windows-x64-msys2-with-Service
+ 
+ .\redis-server.exe .\redis.conf
+```
 
 ### 注意事项
 

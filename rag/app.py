@@ -141,6 +141,7 @@ def chat_with_documents():
         return jsonify(result)
         
     except Exception as e:
+        print(f'聊天失败: {str(e)}')
         return jsonify({
             'error': f'聊天失败: {str(e)}'
         }), 500
