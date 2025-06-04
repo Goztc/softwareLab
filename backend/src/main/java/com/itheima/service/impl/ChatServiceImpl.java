@@ -3,8 +3,12 @@ package com.itheima.service.impl;
 import com.alibaba.fastjson.JSONObject;
 import com.itheima.mapper.ChatMessageMapper;
 import com.itheima.mapper.ChatSessionMapper;
+import com.itheima.mapper.FileMapper;
+import com.itheima.mapper.FolderMapper;
 import com.itheima.pojo.ChatMessage;
 import com.itheima.pojo.ChatSession;
+import com.itheima.pojo.File;
+import com.itheima.pojo.Folder;
 import com.itheima.service.ChatService;
 import com.itheima.utils.HttpClientUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -20,6 +24,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -27,6 +32,8 @@ import java.util.Map;
 public class ChatServiceImpl implements ChatService {
     private final ChatSessionMapper sessionMapper;
     private final ChatMessageMapper messageMapper;
+    private final FileMapper fileMapper;
+    private final FolderMapper folderMapper;
 
     @Value("${rag.api.url:http://localhost:5000}")
     private String ragApiUrl;
@@ -67,6 +74,35 @@ public class ChatServiceImpl implements ChatService {
         ChatMessage userMessage = saveMessage(sessionId, userId, content, "user");
         // 调用RAG API获取回复
         String aiResponse = getAIResponse(userId, content, sessionId);
+
+        // 保存AI回复
+        return saveMessage(sessionId, userId, aiResponse, "assistant");
+    }
+
+    @Override
+    @Transactional
+    public ChatMessage sendMessage(Long sessionId, Long userId, String content, List<Long> fileIds, List<Long> folderIds) {
+        // 验证会话是否存在
+        ChatSession session = sessionMapper.selectById(sessionId);
+        if (session == null) {
+            log.error("会话不存在，sessionId: {}, userId: {}", sessionId, userId);
+            throw new RuntimeException("会话不存在，sessionId: " + sessionId);
+        }
+        
+        // 验证会话是否属于当前用户
+        if (!session.getUserId().equals(userId)) {
+            log.error("会话不属于当前用户，sessionId: {}, userId: {}, sessionUserId: {}", 
+                    sessionId, userId, session.getUserId());
+            throw new RuntimeException("无权限访问该会话");
+        }
+        
+        // 收集所有文件路径
+        List<String> documentPaths = collectDocumentPaths(userId, fileIds, folderIds);
+        
+        // 保存用户消息
+        ChatMessage userMessage = saveMessage(sessionId, userId, content, "user");
+        // 调用RAG API获取回复（使用指定的文档路径）
+        String aiResponse = getAIResponseWithDocuments(userId, content, sessionId, documentPaths);
 
         // 保存AI回复
         return saveMessage(sessionId, userId, aiResponse, "assistant");
@@ -270,4 +306,171 @@ public class ChatServiceImpl implements ChatService {
         return true;
     }
 
+    /**
+     * 收集指定文件和文件夹的所有文档路径
+     * @param userId 用户ID
+     * @param fileIds 文件ID列表
+     * @param folderIds 文件夹ID列表
+     * @return 文档路径列表
+     */
+    private List<String> collectDocumentPaths(Long userId, List<Long> fileIds, List<Long> folderIds) {
+        List<String> documentPaths = new ArrayList<>();
+        
+        // 如果文件和文件夹ID都为空，使用默认的user_{userId}路径
+        if ((fileIds == null || fileIds.isEmpty()) && (folderIds == null || folderIds.isEmpty())) {
+            documentPaths.add("user_" + userId);
+            return documentPaths;
+        }
+        
+        // 处理指定的文件
+        if (fileIds != null && !fileIds.isEmpty()) {
+            List<File> files = fileMapper.selectBatchIds(fileIds);
+            for (File file : files) {
+                // 验证文件归属
+                if (file.getUserId().equals(userId)) {
+                    documentPaths.add(file.getFilePath());
+                }
+            }
+        }
+        
+        // 处理指定的文件夹（递归获取所有文件）
+        if (folderIds != null && !folderIds.isEmpty()) {
+            for (Long folderId : folderIds) {
+                List<String> folderPaths = collectFolderPaths(userId, folderId);
+                documentPaths.addAll(folderPaths);
+            }
+        }
+        
+        return documentPaths;
+    }
+
+    /**
+     * 递归收集文件夹中的所有文件路径
+     * @param userId 用户ID
+     * @param folderId 文件夹ID
+     * @return 文件路径列表
+     */
+    private List<String> collectFolderPaths(Long userId, Long folderId) {
+        List<String> paths = new ArrayList<>();
+        
+        // 验证文件夹归属
+        Folder folder = folderMapper.selectById(folderId);
+        if (folder == null || !folder.getUserId().equals(userId)) {
+            log.warn("文件夹不存在或无权限访问，folderId: {}, userId: {}", folderId, userId);
+            return paths;
+        }
+        
+        // 获取当前文件夹下的所有文件
+        LambdaQueryWrapper<File> fileQuery = new LambdaQueryWrapper<>();
+        fileQuery.eq(File::getFolderId, folderId)
+                .eq(File::getUserId, userId);
+        List<File> files = fileMapper.selectList(fileQuery);
+        
+        for (File file : files) {
+            paths.add(file.getFilePath());
+        }
+        
+        // 递归处理子文件夹
+        LambdaQueryWrapper<Folder> folderQuery = new LambdaQueryWrapper<>();
+        folderQuery.eq(Folder::getParentId, folderId)
+                .eq(Folder::getUserId, userId);
+        List<Folder> subFolders = folderMapper.selectList(folderQuery);
+        
+        for (Folder subFolder : subFolders) {
+            paths.addAll(collectFolderPaths(userId, subFolder.getId()));
+        }
+        
+        return paths;
+    }
+
+    /**
+     * 调用RAG API获取回复（使用指定的文档路径列表）
+     * @param userId 用户ID
+     * @param userInput 用户输入
+     * @param sessionId 会话ID
+     * @param documentPaths 文档路径列表
+     * @return AI回复
+     */
+    private String getAIResponseWithDocuments(Long userId, String userInput, Long sessionId, List<String> documentPaths) {
+        try {
+            // 获取当前会话的历史消息
+            List<ChatMessage> historyMessages = getMessageHistory(sessionId);
+            
+            // 构建请求体调用Flask RAG后端
+            Map<String, Object> requestBody = new HashMap<>();
+            requestBody.put("message", userInput);
+            
+            // 设置文档路径（如果为空或只有一个路径则使用字符串，否则使用数组）
+            if (documentPaths.isEmpty()) {
+                requestBody.put("document_path", "user_" + userId);
+            } else if (documentPaths.size() == 1) {
+                requestBody.put("document_path", documentPaths.get(0));
+            } else {
+                requestBody.put("document_path", documentPaths);
+            }
+            
+            requestBody.put("conversation_id", "session_" + sessionId);
+            
+            // 构建历史对话数据
+            if (!historyMessages.isEmpty()) {
+                List<Map<String, Object>> history = new ArrayList<>();
+                
+                // 将消息配对成问答对，限制最近10轮对话
+                for (int i = 0; i < historyMessages.size() - 1; i += 2) {
+                    ChatMessage userMsg = historyMessages.get(i);
+                    if (i + 1 < historyMessages.size()) {
+                        ChatMessage assistantMsg = historyMessages.get(i + 1);
+                        
+                        // 确保是正确的用户-助手配对
+                        if ("user".equals(userMsg.getRole()) && "assistant".equals(assistantMsg.getRole())) {
+                            Map<String, Object> historyItem = new HashMap<>();
+                            historyItem.put("question", userMsg.getContent());
+                            historyItem.put("answer", assistantMsg.getContent());
+                            historyItem.put("timestamp", assistantMsg.getCreateTime().toString());
+                            history.add(historyItem);
+                            
+                            // 限制历史记录数量，避免请求过大
+                            if (history.size() >= 10) {
+                                break;
+                            }
+                        }
+                    }
+                }
+                
+                if (!history.isEmpty()) {
+                    requestBody.put("history", history);
+                    log.info("传递历史对话记录数量: {}", history.size());
+                }
+            }
+
+            JSONObject jsonResponse = HttpClientUtil.getInstance()
+                    .url(ragApiUrl + "/chat")
+                    .addHeader("Accept", "application/json")
+                    .addHeader("Content-Type", "application/json")
+                    .jsonBody(requestBody)
+                    .post()
+                    .executeForJson();
+            
+            log.info("RAG API response: {}", jsonResponse.toJSONString());
+            log.info("使用的文档路径: {}", documentPaths);
+            
+            // 解析响应内容
+            if (jsonResponse.containsKey("answer")) {
+                return jsonResponse.getString("answer");
+            } else if (jsonResponse.containsKey("response")) {
+                return jsonResponse.getString("response");
+            }
+
+            log.error("Invalid RAG API response format: {}", jsonResponse);
+            return "抱歉，获取AI回复时发生错误";
+        } catch (Exception e) {
+            log.error("调用RAG API失败", e);
+            return "抱歉，AI服务暂时不可用，请稍后再试。";
+        }
+    }
+
+    @Override
+    public List<String> previewDocumentPaths(Long userId, List<Long> fileIds, List<Long> folderIds) {
+        return collectDocumentPaths(userId, fileIds, folderIds);
+    }
 }

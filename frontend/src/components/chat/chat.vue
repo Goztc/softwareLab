@@ -153,6 +153,37 @@
   
         <!-- 输入区域 -->
         <div class="input-container">
+          <!-- 选中文件显示区域 -->
+          <div v-if="selectedFiles.length > 0 || selectedFolders.length > 0" class="selected-files-container">
+            <div class="selected-files-header">
+              <span>已选择的文件和文件夹：</span>
+              <el-button size="small" @click="clearSelection" text>清空选择</el-button>
+            </div>
+            <div class="selected-files-list">
+              <el-tag 
+                v-for="file in selectedFiles" 
+                :key="'file-' + file.id"
+                closable
+                @close="removeSelectedFile(file.id)"
+                class="selected-item"
+              >
+                <el-icon><Document /></el-icon>
+                {{ file.fileName }}
+              </el-tag>
+              <el-tag 
+                v-for="folder in selectedFolders" 
+                :key="'folder-' + folder.id"
+                closable
+                @close="removeSelectedFolder(folder.id)"
+                class="selected-item"
+                type="warning"
+              >
+                <el-icon><Folder /></el-icon>
+                {{ folder.folderName }}
+              </el-tag>
+            </div>
+          </div>
+
           <el-input
             v-model="userInput"
             @keyup.enter="sendMessage"
@@ -203,6 +234,66 @@
         </div>
       </div>
     </div>
+
+    <!-- 右侧文件树栏 -->
+    <div class="file-sidebar" :class="{ 'file-sidebar-collapsed': isFileSidebarCollapsed }">
+      <div class="file-sidebar-header">
+        <h3 v-if="!isFileSidebarCollapsed">选择文件</h3>
+        <el-button 
+          @click="toggleFileSidebar" 
+          :icon="isFileSidebarCollapsed ? 'el-icon-s-unfold' : 'el-icon-s-fold'" 
+          circle 
+          class="collapse-btn"
+        />
+      </div>
+
+      <div v-if="!isFileSidebarCollapsed" class="file-content">
+        <!-- 文件树 -->
+        <div class="file-tree-container">
+          <el-tree
+            ref="fileTreeRef"
+            :data="fileTreeData"
+            :props="treeProps"
+            show-checkbox
+            node-key="id"
+            :default-expand-all="false"
+            :expand-on-click-node="false"
+            :check-on-click-node="false"
+            @check="handleTreeCheck"
+            @node-click="handleTreeNodeClick"
+            class="file-tree"
+          >
+            <template #default="{ node, data }">
+              <div class="tree-node">
+                <div class="node-content">
+                  <el-icon class="node-icon" :color="getNodeColor(data)">
+                    <component :is="getNodeIcon(data)" />
+                  </el-icon>
+                  <span class="node-label">{{ data.label }}</span>
+                </div>
+                <div class="node-meta">
+                  <span class="node-type">{{ data.isFolder ? '文件夹' : '文件' }}</span>
+                </div>
+              </div>
+            </template>
+          </el-tree>
+
+          <el-empty 
+            v-if="!fileTreeData.length" 
+            description="暂无文件和文件夹" 
+            :image-size="60"
+          />
+        </div>
+
+        <!-- 选择统计 -->
+        <div class="selection-summary">
+          <div class="summary-text">
+            已选择: {{ getSelectedCount().files }} 个文件, {{ getSelectedCount().folders }} 个文件夹
+          </div>
+          <el-button size="small" @click="clearTreeSelection" text>清空</el-button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -210,19 +301,41 @@
 import { ref, onMounted, nextTick, computed } from 'vue'
 import { marked } from 'marked'
 import { useChatStore } from '@/stores/chat'
-import { ChatDotRound, Plus, Promotion, Delete, DocumentCopy, Edit } from '@element-plus/icons-vue'
+import { ChatDotRound, Plus, Promotion, Delete, DocumentCopy, Edit, Document, 
+         Folder, HomeFilled, ArrowUp, Files, Picture, VideoCamera, Headset } from '@element-plus/icons-vue'
 import { format } from 'date-fns'
 import { useDisplay } from 'vuetify'
 import { ElMessage } from 'element-plus'
 import CodeBlock from "@/components/chat/CodeBlock.vue"
+import { chatApi } from '@/api/chat'
+import { folderApi } from '@/api/folder'
+import type { MyFile, Folder as FolderType } from '@/types'
 
 const chatStore = useChatStore()
 const userInput = ref('')
 const isSending = ref(false)
 const isSidebarCollapsed = ref(false)
+const isFileSidebarCollapsed = ref(false)
 const chatWindow = ref<HTMLElement | null>(null)
 const { mobile } = useDisplay()
 const isMobile = computed(() => mobile.value)
+
+// 文件选择相关状态
+const currentFolderId = ref(0)
+const currentFolderPath = ref<FolderType[]>([{ id: 0, folderName: '根目录', parentId: 0, userId: 0, createTime: '', updateTime: '' }])
+const currentFolderContents = ref<{ folders: FolderType[], files: MyFile[] }>({ folders: [], files: [] })
+const selectedFileIds = ref(new Set<number>())
+const selectedFolderIds = ref(new Set<number>())
+const selectedFiles = ref<MyFile[]>([])
+const selectedFolders = ref<FolderType[]>([])
+
+// 树形结构相关状态
+const fileTreeRef = ref()
+const fileTreeData = ref<any[]>([])
+const treeProps = {
+  children: 'children',
+  label: 'label'
+}
 
 // 用户和机器人的头像
 import userAvatar from '@/assets/bgimg.png';
@@ -276,7 +389,292 @@ onMounted(async () => {
   if (chatStore.sessions.length > 0 && !chatStore.currentSessionId) {
     await chatStore.loadMessageHistory(chatStore.sessions[0].id)
   }
+  // 初始化文件树 - 使用与 FileExplorer 相同的逻辑
+  await initFileTree()
 })
+
+// 初始化文件树的方法
+const initFileTree = async () => {
+  try {
+    // 1. 尝试获取文件夹树
+    const treeResponse = await folderApi.getFolderTree()
+    
+    // 2. 如果获取失败或树为空，初始化根目录
+    if (treeResponse.code !== 0 || !treeResponse.data?.length) {
+      const initResponse = await folderApi.initRootFolder()
+      if (initResponse.code !== 0) {
+        throw new Error(`初始化根目录失败: ${initResponse.message}`)
+      }
+      
+      // 使用新建的根目录
+      currentFolderId.value = initResponse.data.id
+      currentFolderPath.value = [initResponse.data]
+    } else {
+      // 3. 正常情况使用获取到的树数据，选择第一个根文件夹
+      const rootFolder = treeResponse.data[0]
+      currentFolderId.value = rootFolder.id
+      currentFolderPath.value = [rootFolder]
+    }
+    
+    // 4. 加载根文件夹内容
+    await loadFolderContents(currentFolderId.value)
+  } catch (error) {
+    console.error('初始化文件树失败:', error)
+    ElMessage.error('初始化文件树失败')
+  }
+}
+
+// 文件树相关方法
+const loadFolderContents = async (folderId: number) => {
+  try {
+    const response = await folderApi.getContents(folderId)
+    if (response.code !== 0) {
+      throw new Error(response.message)
+    }
+    currentFolderContents.value = response.data
+    currentFolderId.value = folderId
+    
+    // 构建树形数据
+    buildFileTreeData()
+  } catch (error) {
+    console.error('加载文件夹内容失败:', error)
+    ElMessage.error('加载文件夹内容失败')
+  }
+}
+
+// 构建树形数据
+const buildFileTreeData = () => {
+  const treeData: any[] = []
+  
+  // 添加文件夹节点
+  currentFolderContents.value.folders.forEach(folder => {
+    treeData.push({
+      id: `folder-${folder.id}`,
+      label: folder.folderName,
+      isFolder: true,
+      folderData: folder,
+      children: [] // 子文件夹需要动态加载
+    })
+  })
+  
+  // 添加文件节点
+  currentFolderContents.value.files.forEach(file => {
+    treeData.push({
+      id: `file-${file.id}`,
+      label: file.fileName,
+      isFolder: false,
+      fileData: file
+    })
+  })
+  
+  fileTreeData.value = treeData
+}
+
+// 处理树形节点选择
+const handleTreeCheck = (checkedData: any, { checkedKeys, checkedNodes }: any) => {
+  // 清空当前选择
+  selectedFiles.value = []
+  selectedFolders.value = []
+  selectedFileIds.value.clear()
+  selectedFolderIds.value.clear()
+  
+  // 重新构建选择列表
+  checkedNodes.forEach((node: any) => {
+    if (node.isFolder && node.folderData) {
+      selectedFolders.value.push(node.folderData)
+      selectedFolderIds.value.add(node.folderData.id)
+    } else if (!node.isFolder && node.fileData) {
+      selectedFiles.value.push(node.fileData)
+      selectedFileIds.value.add(node.fileData.id)
+    }
+  })
+}
+
+// 处理树形节点点击（展开文件夹）
+const handleTreeNodeClick = async (nodeData: any, node: any) => {
+  if (nodeData.isFolder && node.childNodes.length === 0) {
+    // 动态加载子文件夹内容
+    try {
+      const response = await folderApi.getContents(nodeData.folderData.id)
+      if (response.code === 0) {
+        const children: any[] = []
+        
+        // 添加子文件夹
+        response.data.folders.forEach((folder: FolderType) => {
+          children.push({
+            id: `folder-${folder.id}`,
+            label: folder.folderName,
+            isFolder: true,
+            folderData: folder,
+            children: []
+          })
+        })
+        
+        // 添加文件
+        response.data.files.forEach((file: MyFile) => {
+          children.push({
+            id: `file-${file.id}`,
+            label: file.fileName,
+            isFolder: false,
+            fileData: file
+          })
+        })
+        
+        // 更新节点children
+        nodeData.children = children
+      }
+    } catch (error) {
+      console.error('加载子文件夹失败:', error)
+      ElMessage.error('加载子文件夹失败')
+    }
+  }
+}
+
+// 获取节点图标
+const getNodeIcon = (data: any) => {
+  if (data.isFolder) {
+    return Folder
+  } else {
+    return getFileIcon(data.label)
+  }
+}
+
+// 获取节点颜色
+const getNodeColor = (data: any) => {
+  if (data.isFolder) {
+    return '#409EFF'
+  } else {
+    return getFileColor(data.label)
+  }
+}
+
+// 获取选择数量统计
+const getSelectedCount = () => {
+  return {
+    files: selectedFiles.value.length,
+    folders: selectedFolders.value.length
+  }
+}
+
+// 清空树形选择
+const clearTreeSelection = () => {
+  if (fileTreeRef.value) {
+    fileTreeRef.value.setCheckedKeys([])
+  }
+  clearSelection()
+}
+
+const enterFolder = async (folderId: number) => {
+  try {
+    // 获取当前文件夹信息用于构建路径
+    const folder = currentFolderContents.value.folders.find(f => f.id === folderId)
+    if (folder) {
+      // 添加到路径
+      currentFolderPath.value.push(folder)
+      // 加载子文件夹内容
+      await loadFolderContents(folderId)
+    }
+  } catch (error) {
+    console.error('进入文件夹失败:', error)
+    ElMessage.error('进入文件夹失败')
+  }
+}
+
+const navigateToFolder = async (level: number) => {
+  if (currentFolderPath.value.length <= level) return
+  
+  const targetIndex = currentFolderPath.value.length - 1 - level
+  const targetFolder = currentFolderPath.value[targetIndex]
+  
+  if (targetFolder) {
+    // 截断路径到目标位置
+    currentFolderPath.value = currentFolderPath.value.slice(0, targetIndex + 1)
+    await loadFolderContents(targetFolder.id)
+  }
+}
+
+const toggleFileSidebar = () => {
+  isFileSidebarCollapsed.value = !isFileSidebarCollapsed.value
+}
+
+const removeSelectedFile = (fileId: number) => {
+  selectedFileIds.value.delete(fileId)
+  selectedFiles.value = selectedFiles.value.filter(f => f.id !== fileId)
+  
+  // 同步更新树形选择状态
+  if (fileTreeRef.value) {
+    const currentChecked = fileTreeRef.value.getCheckedKeys()
+    const newChecked = currentChecked.filter((key: string) => key !== `file-${fileId}`)
+    fileTreeRef.value.setCheckedKeys(newChecked)
+  }
+}
+
+const removeSelectedFolder = (folderId: number) => {
+  selectedFolderIds.value.delete(folderId)
+  selectedFolders.value = selectedFolders.value.filter(f => f.id !== folderId)
+  
+  // 同步更新树形选择状态
+  if (fileTreeRef.value) {
+    const currentChecked = fileTreeRef.value.getCheckedKeys()
+    const newChecked = currentChecked.filter((key: string) => key !== `folder-${folderId}`)
+    fileTreeRef.value.setCheckedKeys(newChecked)
+  }
+}
+
+const clearSelection = () => {
+  selectedFileIds.value.clear()
+  selectedFolderIds.value.clear()
+  selectedFiles.value = []
+  selectedFolders.value = []
+}
+
+// 获取文件图标
+const getFileIcon = (fileName: string) => {
+  const extension = fileName.split('.').pop()?.toLowerCase()
+  switch(extension) {
+    case 'pdf':
+    case 'doc':
+    case 'docx':
+    case 'xls':
+    case 'xlsx':
+    case 'ppt':
+    case 'pptx': return Document
+    case 'jpg':
+    case 'jpeg':
+    case 'png':
+    case 'gif': return Picture
+    case 'mp4':
+    case 'avi':
+    case 'mov': return VideoCamera
+    case 'mp3':
+    case 'wav': return Headset
+    default: return Files
+  }
+}
+
+// 获取文件图标颜色
+const getFileColor = (fileName: string) => {
+  const extension = fileName.split('.').pop()?.toLowerCase()
+  switch(extension) {
+    case 'pdf': return '#FF5252'
+    case 'doc':
+    case 'docx': return '#2E7D32'
+    case 'xls':
+    case 'xlsx': return '#388E3C'
+    case 'ppt':
+    case 'pptx': return '#D32F2F'
+    case 'jpg':
+    case 'jpeg':
+    case 'png':
+    case 'gif': return '#FF6D00'
+    case 'mp4':
+    case 'avi':
+    case 'mov': return '#6A1B9A'
+    case 'mp3':
+    case 'wav': return '#0288D1'
+    default: return '#607D8B'
+  }
+}
 
 const formatTime = (timeString: string) => {
   return format(new Date(timeString), 'HH:mm')
@@ -294,7 +692,14 @@ const sendMessage = async () => {
       await chatStore.createNewSession(sessionName)
     }
 
-    await chatStore.sendNewMessage(trimmedMessage)
+    // 构建请求数据
+    const messageData = {
+      content: trimmedMessage,
+      fileIds: selectedFiles.value.length > 0 ? selectedFiles.value.map(f => f.id) : undefined,
+      folderIds: selectedFolders.value.length > 0 ? selectedFolders.value.map(f => f.id) : undefined
+    }
+
+    await chatStore.sendNewMessageWithFiles(messageData)
     userInput.value = ''
     await nextTick()
     scrollToBottom()
@@ -714,6 +1119,39 @@ const clearCurrentSessionHistory = async () => {
         // border-top: 1px solid #e0e9ff;
         box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.02);
 
+        .selected-files-container {
+          margin-bottom: 12px;
+          padding: 12px;
+          background-color: #f0f5ff;
+          border-radius: 8px;
+          border: 1px solid #d0e1ff;
+
+          .selected-files-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            font-size: 14px;
+            color: #666;
+          }
+
+          .selected-files-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+
+            .selected-item {
+              display: flex;
+              align-items: center;
+              gap: 4px;
+              
+              .el-icon {
+                font-size: 12px;
+              }
+            }
+          }
+        }
+
         .message-input {
           :deep(.el-textarea__inner) {
             border-radius: 16px; /* 增加圆角 */
@@ -809,56 +1247,209 @@ const clearCurrentSessionHistory = async () => {
       }
     }
   }
-    @media (max-width: 1600px) {
-    .main-content .chat-container {
-      max-width: 1200px;
+
+  .file-sidebar {
+    width: 300px;
+    height: 100vh;
+    background-color: #f8fafe;
+    border-left: 1px solid #e0e9ff;
+    display: flex;
+    flex-direction: column;
+    transition: all 0.3s ease;
+
+    &.file-sidebar-collapsed {
+      width: 60px;
+    }
+
+    .file-sidebar-header {
+      padding: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #e0e9ff;
+
+      h3 {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 600;
+        color: #1a73e8;
+      }
+
+      .collapse-btn {
+        background-color: #f8fafe;
+        border-color: #e0e9ff;
+        color: #1a73e8;
+
+        &:hover {
+          background-color: #e6f2ff;
+        }
+      }
+    }
+
+    .file-content {
+      flex: 1;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .file-tree-container {
+      flex: 1;
+      overflow: auto;
+      padding: 8px;
+    }
+
+    .file-tree {
+      background-color: transparent;
       
-      .chat-window {
-        padding: 24px 10%;
+      :deep(.el-tree-node__content) {
+        height: 32px;
+        border-radius: 4px;
+        transition: all 0.2s ease;
         
-        .message-list .message-container {
-          .message-content.bot-message {
-            width: min(90%, 900px);
+        &:hover {
+          background-color: #e6f2ff;
+        }
+      }
+      
+      :deep(.el-tree-node__expand-icon) {
+        color: #1a73e8;
+        font-size: 14px;
+      }
+      
+      :deep(.el-checkbox) {
+        margin-right: 8px;
+      }
+      
+      .tree-node {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+        padding-right: 8px;
+        
+        .node-content {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          flex: 1;
+          min-width: 0;
+
+          .node-icon {
+            flex-shrink: 0;
+            font-size: 16px;
+          }
+
+          .node-label {
+            font-size: 13px;
+            font-weight: 500;
+            color: #333;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+          }
+        }
+
+        .node-meta {
+          flex-shrink: 0;
+          
+          .node-type {
+            font-size: 11px;
+            color: #999;
+          }
+        }
+      }
+    }
+
+    .selection-summary {
+      padding: 12px 16px;
+      border-top: 1px solid #e0e9ff;
+      background-color: #f0f5ff;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+
+      .summary-text {
+        font-size: 12px;
+        color: #666;
+      }
+    }
+  }
+}
+
+@media (max-width: 1600px) {
+  .main-content .chat-container {
+    max-width: 1200px;
+    
+    .chat-window {
+      padding: 24px 10%;
+      
+      .message-list .message-container {
+        .message-content.bot-message {
+          width: min(90%, 900px);
+        }
+      }
+    }
+  }
+}
+
+@media (max-width: 1200px) {
+  .main-content .chat-container {
+    max-width: 100%;
+    
+    .chat-window {
+      padding: 24px 8%;
+      
+      .message-list .message-container {
+        .message-content {
+          max-width: 90%;
+          
+          &.bot-message {
+            width: min(95%, 100%);
           }
         }
       }
     }
   }
+}
 
-  @media (max-width: 1200px) {
-    .main-content .chat-container {
-      max-width: 100%;
+@media (max-width: 768px) {
+  .chat-app-container {
+    flex-direction: column;
+
+    .sidebar {
+      width: 100%;
+      height: auto;
+      max-height: 200px;
       
-      .chat-window {
-        padding: 24px 8%;
-        
-        .message-list .message-container {
-          .message-content {
-            max-width: 90%;
-            
-            &.bot-message {
-              width: min(95%, 100%);
-            }
-          }
-        }
+      &.sidebar-collapsed {
+        width: 100%;
+        max-height: 60px;
       }
     }
-  }
 
-  @media (max-width: 768px) {
-    .main-content .chat-container {
-      .chat-window {
-        padding: 16px;
-        
-        .message-list .message-container {
-          .message-content {
-            max-width: 95%;
-            min-width: 40%;
-            
-            &.bot-message, &.user-message {
-              width: min(95%, 100%);
-            }
-          }
+    .file-sidebar {
+      width: 100%;
+      height: 40vh;
+      border-left: none;
+      border-top: 1px solid #e0e9ff;
+      order: 3;
+      
+      &.file-sidebar-collapsed {
+        height: 60px;
+      }
+    }
+
+    .main-content {
+      order: 2;
+      
+      .chat-container {
+        .chat-window, .input-container {
+          padding: 16px;
+        }
+
+        .message-content {
+          max-width: 90% !important;
         }
       }
     }
@@ -879,33 +1470,6 @@ const clearCurrentSessionHistory = async () => {
     .chat-window, .input-container {
       padding-left: 10%;
       padding-right: 10%;
-    }
-  }
-}
-
-@media (max-width: 768px) {
-  .chat-app-container {
-    flex-direction: column;
-
-    .sidebar {
-      width: 100%;
-      height: auto;
-      max-height: 200px;
-      
-      &.sidebar-collapsed {
-        width: 100%;
-        max-height: 60px;
-      }
-    }
-
-    .main-content .chat-container {
-      .chat-window, .input-container {
-        padding: 16px;
-      }
-
-      .message-content {
-        max-width: 90% !important;
-      }
     }
   }
 }

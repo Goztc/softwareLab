@@ -33,6 +33,18 @@ public interface ChatService {
     ChatMessage sendMessage(Long sessionId, Long userId, String content);
 
     /**
+     * 发送消息并获取AI回复（支持指定文件和文件夹）
+     *
+     * @param sessionId 会话ID
+     * @param userId    用户ID
+     * @param content   消息内容
+     * @param fileIds   文件ID列表（可选）
+     * @param folderIds 文件夹ID列表（可选）
+     * @return AI回复的消息对象
+     */
+    ChatMessage sendMessage(Long sessionId, Long userId, String content, List<Long> fileIds, List<Long> folderIds);
+
+    /**
      * 获取指定会话的消息历史
      *
      * @param sessionId 会话ID
@@ -81,4 +93,15 @@ public interface ChatService {
      * @return 是否清除成功
      */
     boolean clearSessionHistory(Long sessionId, Long userId);
+
+    /**
+     * 预览指定文件和文件夹的文档路径
+     * 用于调试和验证路径收集功能
+     *
+     * @param userId    用户ID
+     * @param fileIds   文件ID列表
+     * @param folderIds 文件夹ID列表
+     * @return 文档路径列表
+     */
+    List<String> previewDocumentPaths(Long userId, List<Long> fileIds, List<Long> folderIds);
 }
