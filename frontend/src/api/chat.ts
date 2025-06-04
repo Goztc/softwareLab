@@ -94,3 +94,30 @@ export function deleteSession(sessionId: number): Promise<ApiResponse<void>> {
 export function clearSessionHistory(sessionId: number): Promise<ApiResponse<void>> {
     return request.delete(`/chat/sessions/${sessionId}/history`);
 }
+
+// RAG相关API
+/**
+ * 功能描述：RAG聊天 - 基于文档的智能对话
+ * @param message - 用户消息
+ * @param documentPath - 文档路径
+ * @param history - 对话历史（可选）
+ * @param conversationId - 对话ID（可选）
+ * @returns Promise包含回答和文档引用信息
+ */
+export function ragChat(
+    message: string,
+    documentPath: string | string[],
+    history?: any[],
+    conversationId?: string
+): Promise<any> {
+    return request.post('http://localhost:5000/chat', {
+        message,
+        document_path: documentPath,
+        history: history || [],
+        conversation_id: conversationId || 'default'
+    }, {
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    });
+}

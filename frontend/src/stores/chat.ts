@@ -2,7 +2,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { ChatSession, ChatMessage } from '@/types'
-import { createSession, sendMessage, getMessageHistory, getSessions, renameSession, deleteSession, clearSessionHistory } from '@/api/chat'
+import { createSession, sendMessage, getMessageHistory, getSessions, renameSession, deleteSession, clearSessionHistory, ragChat } from '@/api/chat'
 import { marked } from 'marked'
 
 export const useChatStore = defineStore('chat', () => {
@@ -12,6 +12,10 @@ export const useChatStore = defineStore('chat', () => {
     const messages = ref<ChatMessage[]>([])
     const loading = ref(false)
     const error = ref<string | null>(null)
+    
+    // RAG相关状态
+    const useRAG = ref<boolean>(true)  // 是否使用RAG模式
+    const documentPath = ref<string>('ai')  // 默认文档路径
 
     // 统一错误处理函数
     const handleError = (err: unknown, defaultMessage: string) => {
@@ -60,22 +64,41 @@ export const useChatStore = defineStore('chat', () => {
             }
             messages.value.push(userMessage)
 
-            // 发送API请求
-            const { code, data, message } = await sendMessage(
-                currentSessionId.value,
-                content
-            )
-            if (code !== 0) throw new Error(message)
+            let aiResponse: any
+            if (useRAG.value) {
+                // 使用RAG聊天
+                const ragResponse = await ragChat(
+                    content, 
+                    documentPath.value,
+                    [], // 暂时不传递历史，可以后续优化
+                    currentSessionId.value.toString()
+                )
+                aiResponse = {
+                    content: ragResponse.answer || ragResponse.response || '',
+                    sources: ragResponse.sources || []
+                }
+            } else {
+                // 使用传统聊天API
+                const { code, data, message } = await sendMessage(
+                    currentSessionId.value,
+                    content
+                )
+                if (code !== 0) throw new Error(message)
+                aiResponse = {
+                    content: data.content || '',
+                    sources: []
+                }
+            }
 
             // AI消息
             const aiMessage: ChatMessage = {
                 id: Date.now() + 1,
                 sessionId: currentSessionId.value,
                 userId: 0,
-                // content: await marked.parse(data.content || ''),
-                content: data.content || '',
+                content: aiResponse.content,
                 role: 'assistant',
-                createTime: new Date().toISOString()
+                createTime: new Date().toISOString(),
+                sources: aiResponse.sources
             }
             messages.value.push(aiMessage)
             return aiMessage
@@ -213,6 +236,9 @@ export const useChatStore = defineStore('chat', () => {
         loadSessions,
         renameSessionById,
         deleteSessionById,
-        clearHistory
+        clearHistory,
+        // RAG相关状态
+        useRAG,
+        documentPath
     }
 })

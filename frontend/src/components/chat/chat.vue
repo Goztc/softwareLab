@@ -143,6 +143,13 @@
                     <div v-else v-html="block.content"></div>
                   </template>
                 </div>
+                
+                <!-- 显示文档引用 -->
+                <DocumentReference 
+                  v-if="msg.role === 'assistant' && msg.sources && msg.sources.length > 0"
+                  :sources="msg.sources"
+                />
+                
                 <div class="message-footer">
                   <span class="message-time">{{ formatTime(msg.createTime) }}</span>
                 </div>
@@ -153,6 +160,28 @@
   
         <!-- 输入区域 -->
         <div class="input-container">
+          <!-- RAG设置面板 -->
+          <div class="rag-settings">
+            <div class="rag-toggle">
+              <el-switch
+                v-model="chatStore.useRAG"
+                size="small"
+                active-text="RAG模式"
+                inactive-text="普通聊天"
+                active-color="#1a73e8"
+              />
+            </div>
+            <div v-if="chatStore.useRAG" class="document-path-input">
+              <el-input
+                v-model="chatStore.documentPath"
+                placeholder="文档路径 (如: ai, tech/ml.txt)"
+                size="small"
+                class="document-input"
+                prefix-icon="Folder"
+              />
+            </div>
+          </div>
+          
           <el-input
             v-model="userInput"
             @keyup.enter="sendMessage"
@@ -215,6 +244,7 @@ import { format } from 'date-fns'
 import { useDisplay } from 'vuetify'
 import { ElMessage } from 'element-plus'
 import CodeBlock from "@/components/chat/CodeBlock.vue"
+import DocumentReference from "@/components/chat/DocumentReference.vue"
 
 const chatStore = useChatStore()
 const userInput = ref('')
@@ -713,6 +743,21 @@ const clearCurrentSessionHistory = async () => {
         // background-color: white;
         // border-top: 1px solid #e0e9ff;
         box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.02);
+
+        .rag-settings {
+          margin-bottom: 12px;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+
+          .rag-toggle {
+            flex: 1;
+          }
+
+          .document-path-input {
+            flex: 1;
+          }
+        }
 
         .message-input {
           :deep(.el-textarea__inner) {

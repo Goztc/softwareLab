@@ -23,6 +23,14 @@ export interface ChatMessage {
     content: string
     role: 'user' | 'assistant'
     createTime: string
+    sources?: DocumentSource[]  // RAG文档引用信息
+}
+
+// RAG文档引用类型
+export interface DocumentSource {
+    source: string
+    content: string
+    absolute_path?: string
 }
 
 export interface MyFile {

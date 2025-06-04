@@ -19,7 +19,7 @@ from langchain.prompts import PromptTemplate
 from langchain_community.chat_models import ChatTongyi
 
 # 本地导入
-from config import QWEN_API_KEY, QWEN_MODEL_NAME, EMBEDDING_MODEL_NAME
+from config import QWEN_API_KEY, QWEN_MODEL_NAME, EMBEDDING_MODEL_NAME, DOCUMENTS_ROOT_PATH
 
 class RAGPipeline:
     """RAG流水线类 - 基于LangChain实现，参考RAG-Tongyi.py优化"""
@@ -80,7 +80,31 @@ class RAGPipeline:
         # 初始化其他属性
         self.conversation_histories = {}
         
+        # 文档根路径
+        self.documents_root_path = Path(DOCUMENTS_ROOT_PATH).resolve()
+        
         print("✅ RAG流水线初始化成功（带缓存优化 + 持久化支持）")
+    
+    def _convert_to_relative_path(self, absolute_path: str) -> str:
+        """将绝对路径转换为相对于文档根目录的相对路径"""
+        try:
+            abs_path = Path(absolute_path).resolve()
+            relative_path = abs_path.relative_to(self.documents_root_path)
+            return str(relative_path).replace('\\', '/')  # 统一使用正斜杠
+        except (ValueError, OSError):
+            # 如果转换失败，返回原路径
+            return absolute_path
+    
+    def _extract_source_info(self, doc) -> dict:
+        """提取并处理源文档信息"""
+        source_path = doc.metadata.get("source", "Unknown")
+        relative_path = self._convert_to_relative_path(source_path)
+        
+        return {
+            "content": doc.page_content,
+            "source": relative_path,  # 相对路径
+            "absolute_path": source_path  # 保留绝对路径（如果需要调试）
+        }
     
     def _load_documents_from_path(self, document_paths) -> List[Document]:
         """从指定路径加载文档，支持多个路径"""
@@ -316,13 +340,12 @@ class RAGPipeline:
             sources = []
             source_files = []
             for doc in result.get("source_documents", []):
-                source_info = doc.metadata.get("source", "Unknown")
-                if source_info not in source_files:
-                    source_files.append(source_info)
-                    sources.append({
-                        "content": doc.page_content,
-                        "source": source_info
-                    })
+                source_info_obj = self._extract_source_info(doc)
+                relative_path = source_info_obj["source"]
+                
+                if relative_path not in source_files:
+                    source_files.append(relative_path)
+                    sources.append(source_info_obj)
             
             return {
                 "question": question,
@@ -430,13 +453,12 @@ class RAGPipeline:
             sources = []
             source_files = []
             for doc in retrieved_docs:
-                source_info = doc.metadata.get("source", "Unknown")
-                if source_info not in source_files:
-                    source_files.append(source_info)
-                    sources.append({
-                        "content": doc.page_content,
-                        "source": source_info
-                    })
+                source_info_obj = self._extract_source_info(doc)
+                relative_path = source_info_obj["source"]
+                
+                if relative_path not in source_files:
+                    source_files.append(relative_path)
+                    sources.append(source_info_obj)
             
             # 添加当前对话到历史
             current_exchange = {
@@ -499,10 +521,13 @@ class RAGPipeline:
                     # 基于排名生成一个模拟分数，排名越靠前分数越高
                     score = 1.0 - (i * 0.1)  # 第一个结果1.0，第二个0.9，以此类推
                 
+                # 提取源文档信息并转换路径
+                source_info_obj = self._extract_source_info(doc)
+                
                 results.append({
                     "rank": i + 1,
                     "content": doc.page_content[:200] + "..." if len(doc.page_content) > 200 else doc.page_content,
-                    "source": doc.metadata.get("source", "Unknown"),
+                    "source": source_info_obj["source"],  # 使用相对路径
                     "score": score
                 })
             
