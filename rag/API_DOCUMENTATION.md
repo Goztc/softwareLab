@@ -356,7 +356,10 @@ curl -X POST http://localhost:5000/conversations/session_001/clear
     "llm_model": "qwen-plus",
     "chunk_size": 500,
     "chunk_overlap": 100,
-    "active_conversations": 2
+    "active_conversations": 2,
+    "cached_vectorstores": 3,
+    "cache_keys": ["user_1", "ai", "research"],
+    "persistent_vectorstores": ["user_1", "ai", "test_docs_ai"]
 }
 ```
 
@@ -366,10 +369,250 @@ curl -X POST http://localhost:5000/conversations/session_001/clear
 - `chunk_size`: 文档分割的块大小
 - `chunk_overlap`: 文档块重叠大小
 - `active_conversations`: 当前活跃对话数量
+- `cached_vectorstores`: 内存中缓存的向量存储数量
+- `cache_keys`: 缓存的向量存储键名列表
+- `persistent_vectorstores`: 磁盘上持久化的向量存储列表
 
 #### 示例
 ```bash
 curl -X GET http://localhost:5000/stats
+```
+
+---
+
+## 向量存储管理接口
+
+### 8. 列出向量存储接口
+
+**接口**: `GET /vectorstores`
+
+**描述**: 列出所有持久化到磁盘的向量存储
+
+#### 请求参数
+无
+
+#### 响应格式
+```json
+{
+    "status": "success",
+    "vectorstores": [
+        {
+            "name": "user_1",
+            "path": "/path/to/vector_stores/user_1",
+            "metadata": {
+                "document_path": "user_1",
+                "document_count": 5,
+                "chunk_count": 42,
+                "created_at": 1703145600.0,
+                "embedding_model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+            }
+        }
+    ],
+    "total": 1
+}
+```
+
+#### 响应字段说明
+- `status`: 操作状态 ("success" | "error")
+- `vectorstores`: 向量存储列表
+  - `name`: 向量存储名称（基于文档路径生成）
+  - `path`: 磁盘存储路径
+  - `metadata`: 元数据信息
+    - `document_path`: 原始文档路径
+    - `document_count`: 处理的文档数量
+    - `chunk_count`: 文本分块数量
+    - `created_at`: 创建时间戳
+    - `embedding_model`: 使用的嵌入模型
+- `total`: 向量存储总数
+
+#### 示例
+```bash
+curl -X GET http://localhost:5000/vectorstores
+```
+
+---
+
+### 9. 构建向量存储接口
+
+**接口**: `POST /vectorstores`
+
+**描述**: 构建并保存向量存储到磁盘
+
+#### 请求格式
+```json
+{
+    "document_path": "相对文档路径",
+    "force_rebuild": false
+}
+```
+
+#### 请求字段说明
+- `document_path` (必需): 文档路径，支持文件或文件夹
+- `force_rebuild` (可选): 是否强制重新构建，默认为false
+
+#### 响应格式
+
+**成功创建：**
+```json
+{
+    "status": "created",
+    "message": "向量存储构建并保存成功: user_1",
+    "path": "/path/to/vector_stores/user_1",
+    "metadata": {
+        "document_path": "user_1",
+        "document_count": 5,
+        "chunk_count": 42,
+        "created_at": 1703145600.0,
+        "embedding_model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+    }
+}
+```
+
+**已存在（未强制重建）：**
+```json
+{
+    "status": "exists",
+    "message": "向量存储已存在: user_1",
+    "path": "/path/to/vector_stores/user_1"
+}
+```
+
+**错误响应：**
+```json
+{
+    "status": "error",
+    "message": "保存向量存储失败: 错误详情"
+}
+```
+
+#### HTTP状态码
+- `201`: 成功创建新的向量存储
+- `200`: 向量存储已存在或操作成功
+- `400`: 请求参数错误
+- `500`: 服务器内部错误
+
+#### 示例
+
+**构建新的向量存储：**
+```bash
+curl -X POST http://localhost:5000/vectorstores \
+  -H "Content-Type: application/json" \
+  -d '{
+    "document_path": "user_123",
+    "force_rebuild": false
+  }'
+```
+
+**强制重新构建：**
+```bash
+curl -X POST http://localhost:5000/vectorstores \
+  -H "Content-Type: application/json" \
+  -d '{
+    "document_path": "user_123",
+    "force_rebuild": true
+  }'
+```
+
+---
+
+### 10. 重新构建向量存储接口
+
+**接口**: `POST /vectorstores/rebuild`
+
+**描述**: 强制重新构建指定的向量存储
+
+#### 请求格式
+```json
+{
+    "document_path": "相对文档路径"
+}
+```
+
+#### 请求字段说明
+- `document_path` (必需): 要重新构建的文档路径
+
+#### 响应格式
+```json
+{
+    "status": "created",
+    "message": "向量存储构建并保存成功: user_1",
+    "path": "/path/to/vector_stores/user_1",
+    "metadata": {
+        "document_path": "user_1",
+        "document_count": 5,
+        "chunk_count": 42,
+        "created_at": 1703145600.0,
+        "embedding_model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+    }
+}
+```
+
+#### 示例
+```bash
+curl -X POST http://localhost:5000/vectorstores/rebuild \
+  -H "Content-Type: application/json" \
+  -d '{
+    "document_path": "user_123"
+  }'
+```
+
+---
+
+### 11. 清除向量存储缓存接口
+
+**接口**: `POST /vectorstores/clear-cache`
+
+**描述**: 清除内存中的向量存储缓存
+
+#### 请求格式
+
+**清除特定路径的缓存：**
+```json
+{
+    "document_path": "相对文档路径"
+}
+```
+
+**清除所有缓存：**
+```json
+{}
+```
+
+#### 请求字段说明
+- `document_path` (可选): 要清除缓存的文档路径，如果不提供则清除所有缓存
+
+#### 响应格式
+
+**清除特定缓存：**
+```jsonx
+{
+    "message": "已清除 user_1 的缓存"
+}
+```
+
+**清除所有缓存：**
+```json
+{
+    "message": "已清除所有缓存"
+}
+```
+
+#### 示例
+
+**清除特定路径缓存：**
+```bash
+curl -X POST http://localhost:5000/vectorstores/clear-cache \
+  -H "Content-Type: application/json" \
+  -d '{
+    "document_path": "user_123"
+  }'
+```
+
+**清除所有缓存：**
+```bash
+curl -X POST http://localhost:5000/vectorstores/clear-cache \
+  -H "Content-Type: application/json" \
+  -d '{}'
 ```
 
 ---

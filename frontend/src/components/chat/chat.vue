@@ -20,9 +20,31 @@
             class="session-item"
             :class="{ 'active': session.id === chatStore.currentSessionId }"
             @click="switchSession(session.id)"
+            @dblclick="startRenameSession(session.id)"
           >
             <el-icon class="session-icon"><ChatDotRound /></el-icon>
-            <span v-if="!isSidebarCollapsed" class="session-name">{{ session.sessionName }}</span>
+            
+            <!-- 正常显示状态 -->
+            <span 
+              v-if="!isSidebarCollapsed && editingSessionId !== session.id" 
+              class="session-name"
+            >
+              {{ session.sessionName }}
+            </span>
+            
+            <!-- 编辑状态 -->
+            <el-input
+              v-if="!isSidebarCollapsed && editingSessionId === session.id"
+              v-model="editingSessionName"
+              class="session-name-input"
+              size="small"
+              @blur="finishRenameSession"
+              @keyup.enter="finishRenameSession"
+              @keyup.esc="cancelRenameSession"
+              ref="sessionNameInput"
+            />
+            
+            <!-- 折叠状态显示 -->
             <el-tooltip 
               v-if="isSidebarCollapsed" 
               :content="session.sessionName" 
@@ -62,7 +84,7 @@
         <div class="chat-window" ref="chatWindow">
           <div v-if="chatStore.messages.length === 0" class="empty-message">
             <div class="welcome-message">
-              <h2>DeepSeek Chat</h2>
+              <h2>Qwen RAG</h2>
               <p>开始与AI助手对话，探索无限可能</p>
             </div>
           </div>
@@ -158,10 +180,21 @@
     
           <div class="action-buttons">
             <el-button 
-              @click="resetMessage" 
+              @click="deleteCurrentSession" 
+              type="danger" 
+              plain 
+              class="delete-session-btn"
+              :disabled="!chatStore.currentSessionId"
+            >
+              <el-icon><Delete /></el-icon>
+              <span v-if="!isMobile">删除会话</span>
+            </el-button>
+            <el-button 
+              @click="clearCurrentSessionHistory" 
               type="info" 
               plain 
               class="reset-btn"
+              :disabled="!chatStore.currentSessionId || chatStore.messages.length === 0"
             >
               <el-icon><Delete /></el-icon>
               <span v-if="!isMobile">清空对话</span>
@@ -334,6 +367,68 @@ const editMessage = (index: number) => {
   
   chatStore.messages = chatStore.messages.slice(0, index)
 }
+
+const editingSessionId = ref<number | null>(null)
+const editingSessionName = ref('')
+const sessionNameInput = ref<HTMLInputElement | null>(null)
+
+const startRenameSession = async (sessionId: number) => {
+  editingSessionId.value = sessionId
+  const session = chatStore.sessions.find(s => s.id === sessionId)
+  if (session) {
+    editingSessionName.value = session.sessionName
+    // 等待DOM更新后聚焦输入框
+    await nextTick()
+    const inputElement = document.querySelector('.session-name-input input') as HTMLInputElement
+    if (inputElement) {
+      inputElement.focus()
+      inputElement.select() // 选中所有文本
+    }
+  }
+}
+
+const finishRenameSession = async () => {
+  if (editingSessionId.value !== null && editingSessionName.value.trim() !== '') {
+    try {
+      await chatStore.renameSessionById(editingSessionId.value, editingSessionName.value.trim())
+      ElMessage.success('会话重命名成功')
+    } catch (error) {
+      console.error('重命名失败:', error)
+      ElMessage.error('重命名失败')
+    }
+  }
+  editingSessionId.value = null
+  editingSessionName.value = ''
+}
+
+const cancelRenameSession = () => {
+  editingSessionId.value = null
+  editingSessionName.value = ''
+}
+
+const deleteCurrentSession = async () => {
+  if (chatStore.currentSessionId) {
+    try {
+      await chatStore.deleteSessionById(chatStore.currentSessionId)
+      ElMessage.success('会话已删除')
+    } catch (error) {
+      console.error('删除会话失败:', error)
+      ElMessage.error('删除会话失败')
+    }
+  }
+}
+
+const clearCurrentSessionHistory = async () => {
+  if (chatStore.currentSessionId) {
+    try {
+      await chatStore.clearHistory(chatStore.currentSessionId)
+      ElMessage.success('会话历史已清除')
+    } catch (error) {
+      console.error('清除历史失败:', error)
+      ElMessage.error('清除历史失败')
+    }
+  }
+}
 </script>
 
 <style lang="scss" scoped>
@@ -423,6 +518,11 @@ const editMessage = (index: number) => {
         .session-name-collapsed {
           font-weight: bold;
           color: #1a73e8;
+        }
+
+        .session-name-input {
+          width: 100%;
+          margin-left: 8px;
         }
       }
     }
@@ -651,19 +751,58 @@ const editMessage = (index: number) => {
           margin-top: 12px;
           display: flex;
           justify-content: flex-end;
+          gap: 12px;
+
+          .delete-session-btn {
+            border-radius: 12px;
+            padding: 8px 16px;
+            color: #f56565;
+            border-color: #fed7d7;
+            background-color: #fef2f2;
+            transition: all 0.3s ease;
+
+            &:hover {
+              color: white;
+              background-color: #f56565;
+              border-color: #f56565;
+              transform: translateY(-1px);
+            }
+
+            &:disabled {
+              opacity: 0.5;
+              cursor: not-allowed;
+              
+              &:hover {
+                color: #f56565;
+                background-color: #fef2f2;
+                border-color: #fed7d7;
+                transform: none;
+              }
+            }
+          }
 
           .reset-btn {
-            border-radius: 12px; /* 增加圆角 */
+            border-radius: 12px;
             padding: 8px 16px;
             color: #7aa6ff;
             border-color: #d0e1ff;
             transition: all 0.3s ease;
 
-
             &:hover {
               color: #1a73e8;
               border-color: #1a73e8;
-              transform: translateY(-1px); /* 添加轻微上浮效果 */
+              transform: translateY(-1px);
+            }
+
+            &:disabled {
+              opacity: 0.5;
+              cursor: not-allowed;
+              
+              &:hover {
+                color: #7aa6ff;
+                border-color: #d0e1ff;
+                transform: none;
+              }
             }
           }
         }

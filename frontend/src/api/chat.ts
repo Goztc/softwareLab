@@ -56,3 +56,41 @@ export function getMessageHistory(
 export function getSessions(): Promise<ApiResponse<ChatSession[]>> {
     return request.get('/chat/sessions');
 }
+
+/**
+ * 功能描述：重命名会话
+ * @param sessionId - 会话ID
+ * @param sessionName - 新的会话名称
+ * @returns Promise<ApiResponse<ChatSession>>
+ */
+export function renameSession(
+    sessionId: number,
+    sessionName: string
+): Promise<ApiResponse<ChatSession>> {
+    return request.put(`/chat/sessions/${sessionId}`, 
+        { sessionName },
+        {
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        }
+    );
+}
+
+/**
+ * 功能描述：删除会话
+ * @param sessionId - 会话ID
+ * @returns Promise<ApiResponse<void>>
+ */
+export function deleteSession(sessionId: number): Promise<ApiResponse<void>> {
+    return request.delete(`/chat/sessions/${sessionId}`);
+}
+
+/**
+ * 功能描述：清除会话历史
+ * @param sessionId - 会话ID
+ * @returns Promise<ApiResponse<void>>
+ */
+export function clearSessionHistory(sessionId: number): Promise<ApiResponse<void>> {
+    return request.delete(`/chat/sessions/${sessionId}/history`);
+}

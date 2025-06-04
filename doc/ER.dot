@@ -1,0 +1,26 @@
+digraph GoZtcERDiagram {
+    rankdir=LR;
+    node [shape=record, fontname="Microsoft YaHei", style=filled, fillcolor=lightblue];
+    edge [fontname="Microsoft YaHei"];
+    
+    User [label="{用户(user)|id: BIGINT (PK)\lusername: VARCHAR(50) (UQ)\lpassword: VARCHAR(100)\lnickname: VARCHAR(10)\lemail: VARCHAR(128)\luser_pic: VARCHAR(128)\lcreate_time: DATETIME}"];
+    
+    ChatSession [label="{聊天会话(chat_session)|id: BIGINT (PK)\luser_id: BIGINT (FK)\lsession_name: VARCHAR(100)\lcreate_time: DATETIME\lupdate_time: DATETIME}"];
+    
+    ChatMessage [label="{聊天消息(chat_message)|id: BIGINT (PK)\lsession_id: BIGINT (FK)\luser_id: BIGINT (FK)\lcontent: TEXT\lrole: VARCHAR(20)\lcreate_time: DATETIME}"];
+    
+    Folder [label="{文件夹(folder)|id: BIGINT (PK)\lparent_id: BIGINT\luser_id: BIGINT (FK)\lfolder_name: VARCHAR(255)\lcreate_time: DATETIME\lupdate_time: DATETIME}"];
+    
+    File [label="{文件(file)|id: BIGINT (PK)\luser_id: BIGINT (FK)\lfolder_id: BIGINT (FK)\lfile_name: VARCHAR(255)\lfile_path: VARCHAR(255)\lfile_type: VARCHAR(50)\lupload_time: DATETIME}"];
+    
+    // 所有关系箭头指向"1"方
+    ChatSession -> User [label="1:N", dir=forward];
+    ChatMessage -> User [label="1:N", dir=forward];
+    Folder -> User [label="1:N", dir=forward];
+    File -> User [label="1:N", dir=forward];
+    
+    ChatMessage -> ChatSession [label="1:N", dir=forward];
+    
+    Folder:e -> Folder:n [label="1:N 父子关系", dir=forward];
+    File -> Folder [label="1:N", dir=forward];
+}

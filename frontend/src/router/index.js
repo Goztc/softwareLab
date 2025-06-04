@@ -11,6 +11,10 @@ import ChatVue from '@/components/gpt.vue';
 import LoginVue from '@/views/Login.vue';
 import UserVue from '@/components/user.vue';
 import FileExploreVue from '@/components/file.vue'
+
+// 导入token存储
+import { useTokenStore } from '@/stores/token.js'
+
 // 定义路由配置
 // routes 是一个数组，包含多个路由对象，每个对象代表一个路由规则
 const routes = [
@@ -36,6 +40,27 @@ const routes = [
 const router = createRouter({
     history: createWebHistory(),
     routes, // 使用简写
+});
+
+// 添加全局前置守卫
+router.beforeEach((to, from, next) => {
+    const tokenStore = useTokenStore();
+    
+    // 如果访问登录页面，直接放行
+    if (to.path === '/login') {
+        next();
+        return;
+    }
+    
+    // 检查是否有token
+    if (!tokenStore.token) {
+        // 没有token，重定向到登录页
+        next('/login');
+        return;
+    }
+    
+    // 有token，正常访问
+    next();
 });
 
 // 导出路由器

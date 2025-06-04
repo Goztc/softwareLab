@@ -146,7 +146,7 @@ export default defineConfig({
           });
 
           proxy.on('proxyRes', (proxyRes, req, res) => {
-            const chunks = [];
+            const chunks: Buffer[] = [];
             proxyRes.on('data', chunk => chunks.push(chunk));
 
             proxyRes.on('end', () => {

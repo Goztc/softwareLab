@@ -5,8 +5,10 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.itheima.mapper.FileMapper;
 import com.itheima.pojo.File;
 import com.itheima.service.FileService;
+import com.itheima.service.VectorStoreEventListener;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
@@ -31,6 +33,9 @@ public class FileServiceImpl extends ServiceImpl<FileMapper, File> implements Fi
     private String storageRoot;
 
     private final FolderServiceImpl folderService;
+    
+    @Autowired(required = false)
+    private VectorStoreEventListener vectorStoreEventListener;
 
     // ========== 公共业务方法 ==========
 
@@ -47,6 +52,11 @@ public class FileServiceImpl extends ServiceImpl<FileMapper, File> implements Fi
         saveFileToDisk(file, storagePath.resolve(uniqueName));
         baseMapper.insert(fileEntity);
 
+        // 触发向量存储重建事件
+        if (vectorStoreEventListener != null) {
+            vectorStoreEventListener.onFileUploaded(userId);
+        }
+
         return fileEntity;
     }
 
@@ -58,6 +68,11 @@ public class FileServiceImpl extends ServiceImpl<FileMapper, File> implements Fi
 
         file.setFolderId(targetFolderId);
         baseMapper.updateById(file);
+        
+        // 触发向量存储重建事件
+        if (vectorStoreEventListener != null) {
+            vectorStoreEventListener.onFileMoved(userId);
+        }
     }
 
     @Override
@@ -72,6 +87,11 @@ public class FileServiceImpl extends ServiceImpl<FileMapper, File> implements Fi
 
         file.setFileName(newFileName);
         baseMapper.updateById(file);
+
+        // 触发向量存储重建事件
+        if (vectorStoreEventListener != null) {
+            vectorStoreEventListener.onFileRenamed(userId);
+        }
 
         return file;
     }
@@ -94,6 +114,11 @@ public class FileServiceImpl extends ServiceImpl<FileMapper, File> implements Fi
 
         baseMapper.deleteById(fileId);
         deleteFileFromDisk(file);
+        
+        // 触发向量存储重建事件
+        if (vectorStoreEventListener != null) {
+            vectorStoreEventListener.onFileDeleted(userId);
+        }
     }
 
     @Override
@@ -115,6 +140,11 @@ public class FileServiceImpl extends ServiceImpl<FileMapper, File> implements Fi
 
         saveContentToFile(content, storagePath.resolve(uniqueName));
         baseMapper.insert(fileEntity);
+
+        // 触发向量存储重建事件
+        if (vectorStoreEventListener != null) {
+            vectorStoreEventListener.onFileCreated(userId);
+        }
 
         return fileEntity;
     }

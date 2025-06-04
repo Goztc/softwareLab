@@ -1,0 +1,138 @@
+digraph Framework {
+    // 图的整体设置
+    rankdir=TB;
+    nodesep=0.8;  // 增加节点水平间距
+    ranksep=1.0;  // 增加层级垂直间距
+    splines=ortho;  // 使用正交连线，增加清晰度
+    node [shape=box, style=filled, fillcolor=lightblue, fontname="SimHei", fontsize=14, margin="0.3,0.2"];  // 增大字体，调整边距
+    edge [fontname="SimHei", fontsize=12, penwidth=1.2];  // 加粗连线，增大字体
+    
+    // 子图：前端
+    subgraph cluster_frontend {
+        label="前端架构";
+        style=filled;
+        fillcolor="#E6E6E6";  // 更深的灰色，增加对比度
+        fontname="SimHei";
+        fontsize=16;  // 增大标题字体
+        margin=20;  // 增加子图边距
+        
+        vue [label="Vue.js 3\n(Composition API)" fillcolor="#90EE90", penwidth=2];  // 更亮的绿色，加粗边框
+        
+        // Pinia Stores
+        subgraph cluster_stores {
+            label="Pinia 状态管理";
+            style=filled;
+            fillcolor="white";
+            fontname="SimHei";
+            fontsize=15;
+            margin=15;
+            
+            chatStore [label="Chat Store\n(会话管理)" fillcolor="#D0E0FF"];  // 使用不同色调区分
+            tokenStore [label="Token Store\n(认证管理)" fillcolor="#D0E0FF"];
+            fileStore [label="File Store\n(文件管理)" fillcolor="#D0E0FF"];
+            userStore [label="UserInfo Store\n(用户信息)" fillcolor="#D0E0FF"];
+        }
+        
+        // UI组件
+        subgraph cluster_ui {
+            label="用户界面";
+            style=filled;
+            fillcolor="white";
+            fontname="SimHei";
+            fontsize=15;
+            margin=15;
+            
+            elplus [label="Element Plus 组件" fillcolor="#FFE0E0"];
+            chat_ui [label="聊天界面" fillcolor="#FFE0E0"];
+            file_ui [label="文件管理界面" fillcolor="#FFE0E0"];
+            login_ui [label="登录注册界面" fillcolor="#FFE0E0"];
+        }
+        
+        // 前端连接关系
+        vue -> {chatStore, tokenStore, fileStore, userStore} [weight=2];
+        {chatStore, tokenStore, fileStore, userStore} -> elplus [weight=2];
+        elplus -> {chat_ui, file_ui, login_ui} [weight=2];
+    }
+    
+    // 子图：后端
+    subgraph cluster_backend {
+        label="后端架构";
+        style=filled;
+        fillcolor="#FFFFD0";  // 更鲜明的黄色
+        fontname="SimHei";
+        fontsize=16;
+        margin=20;
+        
+        spring [label="Spring Boot" fillcolor="#FF9999", penwidth=2];  // 更亮的红色，加粗边框
+        
+        // 控制器
+        subgraph cluster_controllers {
+            label="Controllers";
+            style=filled;
+            fillcolor="white";
+            fontname="SimHei";
+            fontsize=15;
+            margin=15;
+            
+            userController [label="UserController\n(用户管理)" fillcolor="#E0FFE0"];
+            chatController [label="ChatController\n(会话管理)" fillcolor="#E0FFE0"];
+            fileController [label="FileController\n(文件管理)" fillcolor="#E0FFE0"];
+            folderController [label="FolderController\n(文件夹管理)" fillcolor="#E0FFE0"];
+        }
+        
+        // 服务
+        subgraph cluster_services {
+            label="Services";
+            style=filled;
+            fillcolor="white";
+            fontname="SimHei";
+            fontsize=15;
+            margin=15;
+            
+            userService [label="UserService" fillcolor="#E0FFFF"];
+            chatService [label="ChatService" fillcolor="#E0FFFF"];
+            fileService [label="FileService" fillcolor="#E0FFFF"];
+            folderService [label="FolderService" fillcolor="#E0FFFF"];
+            ragService [label="RAGService" fillcolor="#E0FFFF"];
+        }
+        
+        // 后端连接关系
+        spring -> {userController, chatController, fileController, folderController} [weight=2];
+        userController -> userService [weight=1];
+        chatController -> chatService [weight=1];
+        fileController -> fileService [weight=1];
+        folderController -> folderService [weight=1];
+        chatService -> ragService [weight=1];
+    }
+    
+    // 数据存储
+    subgraph cluster_storage {
+        label="数据存储";
+        style=filled;
+        fillcolor="#E6E6FA";  // 更鲜明的淡紫色
+        fontname="SimHei";
+        fontsize=16;
+        margin=20;
+        
+        mysql [label="MySQL\n(用户、会话、文件数据)" fillcolor="#ADD8E6", penwidth=1.5];  // 更亮的蓝色
+        redis [label="Redis\n(Token缓存)" fillcolor="#FFB6C1", penwidth=1.5];  // 更亮的粉色
+        filesystem [label="文件系统\n(文件存储)" fillcolor="#98FB98", penwidth=1.5];  // 更亮的绿色
+    }
+    
+    // 外部服务
+    ragModel [label="RAG 模型服务\n(检索增强生成)" fillcolor="#FFA07A", shape=ellipse, penwidth=2, fontsize=14];  // 加粗边框
+    
+    // 前后端交互 - 使用不同颜色的边
+    chatStore -> chatController [label="HTTP/API调用", color="#4169E1", fontcolor="#4169E1", penwidth=1.5];
+    tokenStore -> userController [label="认证", color="#4169E1", fontcolor="#4169E1", penwidth=1.5];
+    fileStore -> {fileController, folderController} [label="文件操作", color="#4169E1", fontcolor="#4169E1", penwidth=1.5];
+    userStore -> userController [label="用户信息", color="#4169E1", fontcolor="#4169E1", penwidth=1.5];
+    
+    // 后端与存储交互 - 使用不同颜色的边
+    {userService, chatService, fileService, folderService} -> mysql [label="MyBatis-Plus", color="#8B008B", fontcolor="#8B008B", penwidth=1.5];
+    userService -> redis [label="Token存储", color="#8B008B", fontcolor="#8B008B", penwidth=1.5];
+    fileService -> filesystem [label="文件读写", color="#8B008B", fontcolor="#8B008B", penwidth=1.5];
+    
+    // RAG服务交互 - 使用不同颜色的边
+    ragService -> ragModel [label="OkHttp3调用", color="#A52A2A", fontcolor="#A52A2A", penwidth=1.5];
+}
