@@ -132,6 +132,17 @@ export const useChatStore = defineStore('chat', () => {
         }
     }
 
+    // 重置 store 状态
+    const reset = () => {
+        currentUserId.value = 1;
+        sessions.value = [];
+        currentSessionId.value = null;
+        messages.value = [];
+        loading.value = false;
+        error.value = null;
+    };
+
+
     return {
         currentUserId,
         sessions,
@@ -142,6 +153,7 @@ export const useChatStore = defineStore('chat', () => {
         createNewSession,
         sendNewMessage,
         loadMessageHistory,
-        loadSessions
+        loadSessions,
+        reset,
     }
 })

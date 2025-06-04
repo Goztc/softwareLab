@@ -76,6 +76,22 @@ public class FileController {
     }
 
     /**
+     * 获取文件内容
+     * @param fileId 文件ID
+     * @return 文件内容（字符串）
+     */
+    @GetMapping("/{fileId}/content")
+    public Result<String> getFileContent(@PathVariable Long fileId) throws IOException {
+        Long userId = getCurrentUserId();
+        try {
+            String content = fileService.getFileContent(userId, fileId);
+            return Result.success(content);
+        } catch (Exception e) {
+            return Result.error("获取文件内容失败: " + e.getMessage());
+        }
+    }
+
+    /**
      * 移动文件到新文件夹
      * @param fileId 要移动的文件ID
      * @param targetFolderId 目标文件夹ID

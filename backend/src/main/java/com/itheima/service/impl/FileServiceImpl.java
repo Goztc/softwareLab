@@ -119,6 +119,27 @@ public class FileServiceImpl extends ServiceImpl<FileMapper, File> implements Fi
         return fileEntity;
     }
 
+    @Override
+    public String getFileContent(Long userId, Long fileId) throws IOException {
+        File file = validateFileOwnership(userId, fileId);
+
+        // 检查文件是否为文本类型
+        String fileName = file.getFileName().toLowerCase();
+        if (!fileName.endsWith(".txt")) {
+            throw new IllegalArgumentException("仅支持读取 .txt 文件内容");
+        }
+
+        Path filePath = getPhysicalFilePath(file);
+        if (!Files.exists(filePath)) {
+            throw new IOException("文件不存在于存储系统: " + filePath);
+        }
+
+        // 读取文件内容
+        String content = Files.readString(filePath);
+        log.info("文件内容读取成功: {}", filePath);
+        return content;
+    }
+
     // ========== 私有辅助方法 ==========
 
     private void validateFolderAccess(Long userId, Long folderId) {

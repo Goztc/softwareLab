@@ -86,7 +86,7 @@ Content-Type: application/x-www-form-urlencoded
 Authorization: {{auther_token}}
 
 
-content=这是一个测试文本内容&fileName=测试文件&folderId={{subFolderId}}
+content=hello 我可以实现查看功能了哦&fileName=测试文件2&folderId={{subFolderId}}
 
 
 > {%
@@ -94,12 +94,22 @@ content=这是一个测试文本内容&fileName=测试文件&folderId={{subFolde
     client.global.set("FileId", response.body.data.id);
 %}
 
+### 11.1 查看文本文件内容
+GET http://localhost:8080/files/{{FileId}}/content
+Authorization: {{auther_token}}
+
+> {%
+    client.assert(response.status === 200, "获取文件内容失败");
+    client.assert(response.body.data === "这是一个测试文本内容", "文件内容不匹配");
+%}
+
 ### 12.文件重命名
 PUT http://localhost:8080/files/{{FileId}}/rename?newName=新文件名
 Authorization: {{auther_token}}
+
 
 ### 13. 删除测试文件夹
 DELETE http://localhost:8080/folders/{{rootFolderId}}
 Authorization: {{auther_token}}
 
-### 14. 使用阿里云上传 + url 字段
+

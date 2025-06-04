@@ -62,7 +62,10 @@
             <el-icon><Upload /></el-icon>上传
           </el-button>
           <el-button type="success" @click="createNewFolder" size="small">
-            <el-icon><FolderAdd /></el-icon>新建
+            <el-icon><FolderAdd /></el-icon>新建文件夹
+          </el-button>
+          <el-button type="info" @click="showCreateTextDialog = true" size="small">
+            <el-icon><Document /></el-icon>新建文本
           </el-button>
         </div>
       </div>
@@ -124,7 +127,6 @@
                     </div>
                     <div class="card-content">
                       <div class="name">{{ file.fileName }}</div>
-                      <!-- <div class="meta">{{ formatFileSize(file.size) }}</div> -->
                     </div>
                     <div class="card-actions">
                       <el-tooltip content="下载" placement="top">
@@ -136,11 +138,12 @@
                           <el-icon><Download /></el-icon>
                         </el-button>
                       </el-tooltip>
-                      <el-tooltip content="重命名" placement="top">
+                      <el-tooltip content="编辑" placement="top">
                         <el-button 
                           size="small" 
-                          @click.stop="renameItem(file)"
+                          @click.stop="editFile(file)"
                           circle
+                          :disabled="!isTextFile(file.fileName)"
                         >
                           <el-icon><Edit /></el-icon>
                         </el-button>
@@ -167,6 +170,7 @@
             :image-size="100"
           >
             <el-button type="primary" @click="createNewFolder">新建文件夹</el-button>
+            <el-button type="info" @click="showCreateTextDialog = true">新建文本</el-button>
           </el-empty>
         </template>
       </div>
@@ -217,6 +221,56 @@
           <el-button type="primary" @click="confirmCreateFolder">确定</el-button>
         </template>
       </el-dialog>
+
+      <!-- 新建文本文件对话框 -->
+      <el-dialog 
+        v-model="showCreateTextDialog" 
+        title="新建文本文件" 
+        width="600px"
+      >
+        <el-form :model="createTextForm" label-width="100px">
+          <el-form-item label="文件名">
+            <el-input v-model="createTextForm.fileName" placeholder="请输入文件名（例如：note.txt）" />
+          </el-form-item>
+          <el-form-item label="文件内容">
+            <el-input
+              type="textarea"
+              v-model="createTextForm.content"
+              placeholder="请输入文件内容"
+              :rows="8"
+            />
+          </el-form-item>
+        </el-form>
+        <template #footer>
+          <el-button @click="showCreateTextDialog = false">取消</el-button>
+          <el-button type="primary" @click="createTextFile">确定</el-button>
+        </template>
+      </el-dialog>
+
+      <!-- 编辑文件对话框 -->
+      <el-dialog 
+        v-model="showEditFileDialog" 
+        title="编辑文本文件" 
+        width="600px"
+      >
+        <el-form :model="editFileForm" label-width="100px">
+          <el-form-item label="文件名">
+            <el-input v-model="editFileForm.fileName" disabled />
+          </el-form-item>
+          <el-form-item label="文件内容">
+            <el-input
+              type="textarea"
+              v-model="editFileForm.content"
+              placeholder="请输入文件内容"
+              :rows="8"
+            />
+          </el-form-item>
+        </el-form>
+        <template #footer>
+          <el-button @click="showEditFileDialog = false">取消</el-button>
+          <el-button type="primary" @click="updateFile">确定</el-button>
+        </template>
+      </el-dialog>
     </el-main>
   </div>
 </template>
@@ -243,17 +297,30 @@ import {
   Download
 } from '@element-plus/icons-vue'
 
-const fileStore = useFileStore()
-const showUploadDialog = ref(false)
-const showNewFolderDialog = ref(false)
+import { fileApi } from '@/api/file';
+const fileStore = useFileStore();
+const showUploadDialog = ref(false);
+const showNewFolderDialog = ref(false);
+const showCreateTextDialog = ref(false);
+const showEditFileDialog = ref(false);
 const newFolderForm = ref({
   name: ''
-})
+});
+const createTextForm = ref({
+  fileName: '',
+  content: ''
+});
+const editFileForm = ref({
+  fileId: 0,
+  fileName: '',
+  content: ''
+});
 
 const treeProps = {
   children: 'children',
   label: 'folderName'
-}
+};
+
 
 // 初始化加载数据
 onMounted(() => {
@@ -323,6 +390,73 @@ const confirmCreateFolder = async () => {
     ElMessage.error('文件夹创建失败')
   }
 }
+
+// 创建文本文件
+const createTextFile = async () => {
+  if (!createTextForm.value.fileName.trim()) {
+    ElMessage.warning('请输入文件名');
+    return;
+  }
+  if (!createTextForm.value.content.trim()) {
+    ElMessage.warning('请输入文件内容');
+    return;
+  }
+
+  try {
+    await fileStore.uploadFileByText(createTextForm.value.content, createTextForm.value.fileName);
+    showCreateTextDialog.value = false;
+    ElMessage.success('文本文件创建成功');
+    createTextForm.value = { fileName: '', content: '' }; // 重置表单
+  } catch (error) {
+    ElMessage.error(`文本文件创建失败: ${error instanceof Error ? error.message : String(error)}`);
+  }
+};
+
+// 编辑文件
+const editFile = async (file: MyFile) => {
+  if (!isTextFile(file.fileName)) {
+    ElMessage.warning('仅支持编辑 .txt 文件');
+    return;
+  }
+
+  try {
+    const { code, data, message } = await fileApi.getContent(file.id);
+    if (code !== 0) throw new Error(message);
+
+    editFileForm.value = {
+      fileId: file.id,
+      fileName: file.fileName,
+      content: data
+    };
+    showEditFileDialog.value = true;
+  } catch (error) {
+    ElMessage.error(`获取文件内容失败: ${error instanceof Error ? error.message : String(error)}`);
+  }
+};
+
+// 更新文件（删除并重新创建）
+const updateFile = async () => {
+  if (!editFileForm.value.content.trim()) {
+    ElMessage.warning('请输入文件内容');
+    return;
+  }
+
+  try {
+    await fileStore.deleteFile(editFileForm.value.fileId);
+    await fileStore.uploadFileByText(editFileForm.value.content, editFileForm.value.fileName);
+    showEditFileDialog.value = false;
+    ElMessage.success('文件更新成功');
+    editFileForm.value = { fileId: 0, fileName: '', content: '' }; // 重置表单
+  } catch (error) {
+    ElMessage.error(`文件更新失败: ${error instanceof Error ? error.message : String(error)}`);
+  }
+};
+
+// 判断是否为文本文件
+const isTextFile = (fileName: string) => {
+  return fileName.toLowerCase().endsWith('.txt');
+};
+
 
 // 删除文件
 const deleteFile = async (fileId: number) => {

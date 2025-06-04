@@ -147,6 +147,29 @@ export const useFileStore = defineStore('file', () => {
         }
     };
 
+    // 上传文本文件
+    const uploadFileByText = async (content: string, fileName: string) => {
+        try {
+
+            loading.value = true;
+            error.value = null;
+
+            const { code, data, message } = await fileApi.createText(content, fileName, currentFolderId.value);
+            if (code !== 0) throw new Error(message);
+
+            // 直接更新当前文件夹内容
+            currentFolderContents.value.files.push(data);
+
+            return data;
+        } catch (err) {
+            error.value = `文本文件上传失败: ${err instanceof Error ? err.message : String(err)}`;
+            throw err;
+        } finally {
+            loading.value = false;
+        }
+    };
+
+
     // 删除文件
     const deleteFile = async (fileId: number) => {
         try {
@@ -226,6 +249,15 @@ export const useFileStore = defineStore('file', () => {
         return false
     }
 
+    // 重置 store 状态
+    const reset = () => {
+        currentFolderId.value = 0;
+        currentFolderContents.value = { files: [], folders: [] };
+        folderTree.value = [];
+        loading.value = false;
+        error.value = null;
+    };
+
     return {
         currentFolderId,
         currentFolderContents,
@@ -238,8 +270,10 @@ export const useFileStore = defineStore('file', () => {
         loadFolderContents,
         createFolder,
         uploadFile,
+        uploadFileByText,
         deleteFile,
         deleteFolder,
         renameItem,
+        reset,
     }
 })

@@ -60,4 +60,6 @@ public interface FileService {
     File getFileMetadata(Long userId, Long fileId);
 
     File createTextFile(Long userId, Long folderId, String fileName, String content) throws IOException;
+
+    String getFileContent(Long userId, Long fileId) throws IOException;
 }

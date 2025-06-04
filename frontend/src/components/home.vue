@@ -144,8 +144,12 @@ watch(scrollTop, (newScrollTop, oldScrollTop) => {
 
 import useUserInfoStore from '@/stores/userInfo.js'
 import { useTokenStore } from '@/stores/token.js'
+import { useChatStore } from '@/stores/chat.ts'
+import { useFileStore } from '@/stores/file.ts'
 const tokenStore = useTokenStore();
 const userInfoStore = useUserInfoStore();
+const chatStore = useChatStore()
+const fileStore = useFileStore()
 
 import { ElMessage, ElMessageBox } from 'element-plus'
 const handleCommand = (command)=>{
@@ -166,6 +170,8 @@ const handleCommand = (command)=>{
             //1.清空pinia中存储的token以及个人信息
             tokenStore.removeToken()
             userInfoStore.removeInfo()
+            fileStore.reset();
+            chatStore.reset();
             //2.跳转到登录页面
             router.push('/login')
             ElMessage({

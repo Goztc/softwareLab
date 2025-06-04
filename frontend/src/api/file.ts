@@ -73,6 +73,18 @@ export const fileApi = {
     },
 
     /**
+     * 获取文件内容
+     * @param fileId 文件ID
+     */
+    getContent: (fileId: number): Promise<ApiResponse<string>> => {
+        if (!Number.isInteger(fileId) || fileId <= 0) {
+            return Promise.reject(new Error('文件 ID 必须是正整数'));
+        }
+        return request.get(`/files/${fileId}/content`);
+    },
+
+
+    /**
      * 获取文件元数据
      * @param fileId 文件ID
      */
