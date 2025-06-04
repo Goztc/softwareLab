@@ -1,9 +1,11 @@
 package com.itheima.controller;
 
 import com.itheima.pojo.ChatMessage;
+import com.itheima.pojo.ChatMessageRequest;
 import com.itheima.pojo.ChatSession;
 import com.itheima.pojo.Result;
 import com.itheima.service.ChatService;
+import com.itheima.service.FolderService;
 import com.itheima.utils.ThreadLocalUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -16,6 +18,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class ChatController {
     private final ChatService chatService;
+    private final FolderService folderService;
 
     @PostMapping("/sessions")
     public Result<ChatSession> createSession(@RequestParam String sessionName) {
@@ -40,16 +43,27 @@ public class ChatController {
     @PostMapping("/messages")
     public Result<ChatMessage> sendMessage(
             @RequestParam Long sessionId,
-            @RequestBody Map<String, String> params) {
+            @RequestBody ChatMessageRequest request) {
         // 从线程本地获取当前用户ID
         Map<String, Object> userInfo = ThreadLocalUtil.get();
         Long userId = ((Integer) userInfo.get("id")).longValue();
-        String content = params.get("content");
+        
+        String content = request.getContent();
         if (content == null || content.trim().isEmpty()) {
             return Result.error("消息内容不能为空");
         }
+        
         try {
-            ChatMessage message = chatService.sendMessage(sessionId, userId, content);
+            ChatMessage message;
+            // 如果指定了文件或文件夹，使用新的方法
+            if ((request.getFileIds() != null && !request.getFileIds().isEmpty()) || 
+                (request.getFolderIds() != null && !request.getFolderIds().isEmpty())) {
+                message = chatService.sendMessage(sessionId, userId, content, 
+                    request.getFileIds(), request.getFolderIds());
+            } else {
+                // 否则使用默认方法（使用user_{userId}路径）
+                message = chatService.sendMessage(sessionId, userId, content);
+            }
             return Result.success(message);
         } catch (RuntimeException e) {
             return Result.error(e.getMessage());
@@ -117,6 +131,39 @@ public class ChatController {
             return Result.success(message);
         } else {
             return Result.error("消息不存在");
+        }
+    }
+
+    /**
+     * 获取用户的文件夹树结构（用于聊天时选择文件）
+     */
+    @GetMapping("/folders")
+    public Result<Map<String, Object>> getUserFoldersForChat() {
+        // 从线程本地获取当前用户ID
+        Map<String, Object> userInfo = ThreadLocalUtil.get();
+        Long userId = ((Integer) userInfo.get("id")).longValue();
+        
+        // 获取用户的文件夹树结构和根目录下的文件
+        Map<String, Object> folderContents = folderService.getFolderContents(userId, 0L);
+        return Result.success(folderContents);
+    }
+
+    /**
+     * 测试接口：预览指定文件和文件夹的文档路径
+     * 用于调试和验证路径收集功能
+     */
+    @PostMapping("/preview-paths")
+    public Result<List<String>> previewDocumentPaths(@RequestBody ChatMessageRequest request) {
+        // 从线程本地获取当前用户ID
+        Map<String, Object> userInfo = ThreadLocalUtil.get();
+        Long userId = ((Integer) userInfo.get("id")).longValue();
+        
+        try {
+            List<String> paths = chatService.previewDocumentPaths(
+                userId, request.getFileIds(), request.getFolderIds());
+            return Result.success(paths);
+        } catch (Exception e) {
+            return Result.error("预览路径失败: " + e.getMessage());
         }
     }
 }

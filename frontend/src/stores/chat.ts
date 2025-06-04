@@ -2,7 +2,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { ChatSession, ChatMessage } from '@/types'
-import { createSession, sendMessage, getMessageHistory, getSessions, renameSession, deleteSession, clearSessionHistory } from '@/api/chat'
+import { createSession, sendMessage, getMessageHistory, getSessions, renameSession, deleteSession, clearSessionHistory, sendMessageWithFiles } from '@/api/chat'
 import { marked } from 'marked'
 
 export const useChatStore = defineStore('chat', () => {
@@ -133,6 +133,58 @@ export const useChatStore = defineStore('chat', () => {
     };
 
 
+    // 发送带文件选择的消息
+    const sendNewMessageWithFiles = async (messageData: {
+        content: string;
+        fileIds?: number[];
+        folderIds?: number[];
+    }) => {
+        if (!currentSessionId.value) {
+            throw new Error('No active session')
+        }
+
+        loading.value = true
+        error.value = null
+
+        try {
+            // 用户消息
+            const userMessage: ChatMessage = {
+                id: Date.now(),
+                sessionId: currentSessionId.value,
+                userId: currentUserId.value,
+                content: messageData.content,
+                role: 'user',
+                createTime: new Date().toISOString()
+            }
+            messages.value.push(userMessage)
+
+            // 发送API请求
+            const { code, data, message } = await sendMessageWithFiles(
+                currentSessionId.value,
+                messageData
+            )
+            if (code !== 0) throw new Error(message)
+
+            // AI消息
+            const aiMessage: ChatMessage = {
+                id: Date.now() + 1,
+                sessionId: currentSessionId.value,
+                userId: 0,
+                content: data.content || '',
+                role: 'assistant',
+                createTime: new Date().toISOString()
+            }
+            messages.value.push(aiMessage)
+            return aiMessage
+        } catch (err) {
+            // 发送失败时移除用户消息
+            messages.value = messages.value.filter(msg => msg.role !== 'user' || msg.content !== messageData.content)
+            handleError(err, '发送消息失败')
+        } finally {
+            loading.value = false
+        }
+    }
+
     return {
         currentUserId,
         sessions,
@@ -142,6 +194,7 @@ export const useChatStore = defineStore('chat', () => {
         error,
         createNewSession,
         sendNewMessage,
+        sendNewMessageWithFiles,
         loadMessageHistory,
         loadSessions,
         reset,
