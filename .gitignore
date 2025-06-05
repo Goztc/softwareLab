@@ -53,3 +53,5 @@
 
 *node_modules*
 *all-MiniLM-L6-v2*
+*.pyc
+*__pycache__*

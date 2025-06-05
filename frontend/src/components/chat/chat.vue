@@ -259,6 +259,8 @@
             :default-expand-all="false"
             :expand-on-click-node="false"
             :check-on-click-node="false"
+            lazy
+            :load="loadTreeNode"
             @check="handleTreeCheck"
             @node-click="handleTreeNodeClick"
             class="file-tree"
@@ -448,13 +450,14 @@ const buildFileTreeData = () => {
   
   // 添加文件夹节点
   currentFolderContents.value.folders.forEach(folder => {
-    treeData.push({
+    const folderNode: any = {
       id: `folder-${folder.id}`,
       label: folder.folderName,
       isFolder: true,
       folderData: folder,
-      children: [] // 子文件夹需要动态加载
-    })
+      isLeaf: false // 明确标记为非叶子节点，在懒加载模式下显示展开图标
+    }
+    treeData.push(folderNode)
   })
   
   // 添加文件节点
@@ -463,7 +466,8 @@ const buildFileTreeData = () => {
       id: `file-${file.id}`,
       label: file.fileName,
       isFolder: false,
-      fileData: file
+      fileData: file,
+      isLeaf: true // 明确标记为叶子节点
     })
   })
   
@@ -490,12 +494,17 @@ const handleTreeCheck = (checkedData: any, { checkedKeys, checkedNodes }: any) =
   })
 }
 
-// 处理树形节点点击（展开文件夹）
-const handleTreeNodeClick = async (nodeData: any, node: any) => {
-  if (nodeData.isFolder && node.childNodes.length === 0) {
-    // 动态加载子文件夹内容
+// 懒加载树节点
+const loadTreeNode = async (node: any, resolve: any) => {
+  if (node.level === 0) {
+    // 根节点，返回初始数据
+    resolve(fileTreeData.value)
+    return
+  }
+  
+  if (node.data.isFolder) {
     try {
-      const response = await folderApi.getContents(nodeData.folderData.id)
+      const response = await folderApi.getContents(node.data.folderData.id)
       if (response.code === 0) {
         const children: any[] = []
         
@@ -506,7 +515,7 @@ const handleTreeNodeClick = async (nodeData: any, node: any) => {
             label: folder.folderName,
             isFolder: true,
             folderData: folder,
-            children: []
+            isLeaf: false
           })
         })
         
@@ -516,18 +525,31 @@ const handleTreeNodeClick = async (nodeData: any, node: any) => {
             id: `file-${file.id}`,
             label: file.fileName,
             isFolder: false,
-            fileData: file
+            fileData: file,
+            isLeaf: true
           })
         })
         
-        // 更新节点children
-        nodeData.children = children
+        resolve(children)
+      } else {
+        console.error('加载子文件夹失败:', response.message)
+        ElMessage.error('加载子文件夹失败')
+        resolve([])
       }
     } catch (error) {
       console.error('加载子文件夹失败:', error)
       ElMessage.error('加载子文件夹失败')
+      resolve([])
     }
+  } else {
+    resolve([])
   }
+}
+
+// 处理树形节点点击（展开文件夹）
+const handleTreeNodeClick = async (nodeData: any, node: any) => {
+  // 懒加载模式下，不需要手动处理加载逻辑
+  // el-tree 会自动调用 loadTreeNode 方法
 }
 
 // 获取节点图标
