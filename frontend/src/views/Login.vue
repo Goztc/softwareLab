@@ -37,20 +37,35 @@ const rules = {
     ]
 }
 
+//表单引用
+const registerFormRef = ref()
+const loginFormRef = ref()
+
 //调用后台接口,完成注册
 import { userRegisterService, userLoginService} from '@/api/user.js'
 const register = async () => {
-    //registerData是一个响应式对象,如果要获取值,需要.value
-    let result = await userRegisterService(registerData.value);
-    /* if (result.code === 0) {
-        //成功了
-        alert(result.msg ? result.msg : '注册成功');
-    }else{
-        //失败了
-        alert('注册失败')
-    } */
-    //alert(result.msg ? result.msg : '注册成功');
-    ElMessage.success(result.msg ? result.msg : '注册成功')
+    // 先进行表单校验
+    if (!registerFormRef.value) return
+    
+    try {
+        const valid = await registerFormRef.value.validate()
+        if (!valid) return
+        
+        //registerData是一个响应式对象,如果要获取值,需要.value
+        let result = await userRegisterService(registerData.value);
+        
+        // 根据返回结果进行处理
+        if (result.code === 0) {
+            ElMessage.success(result.message || result.msg || '注册成功')
+            // 注册成功后切换到登录页面并清空表单
+            isRegister.value = false
+            clearRegisterData()
+        } else {
+            ElMessage.error(result.message || result.msg || '注册失败')
+        }
+    } catch (error) {
+        console.error('注册失败:', error)
+    }
 }
 
 //绑定数据,复用注册表单的数据模型
@@ -60,20 +75,32 @@ import {useTokenStore} from '@/stores/token.js'
 import {useRouter} from 'vue-router'
 const router = useRouter()
 const tokenStore = useTokenStore();
-const login =async ()=>{
-    //调用接口,完成登录
-   let result =  await userLoginService(registerData.value);
-   /* if(result.code===0){
-    alert(result.msg? result.msg : '登录成功')
-   }else{
-    alert('登录失败')
-   } */ 
-   //alert(result.msg? result.msg : '登录成功')
-   ElMessage.success(result.msg ? result.msg : '登录成功')
-   //把得到的token存储到pinia中
-   tokenStore.setToken(result.data)
-   //跳转到首页 路由完成跳转
-   router.push('/')
+const login = async () => {
+    // 先进行表单校验
+    if (!loginFormRef.value) return
+    
+    try {
+        const valid = await loginFormRef.value.validate()
+        if (!valid) return
+        
+        //调用接口,完成登录
+        let result = await userLoginService(registerData.value);
+
+        console.log(result)
+        
+        // 根据返回结果进行处理
+        if (result.code === 0) {
+            ElMessage.success(result.message || result.msg || '登录成功')
+            //把得到的token存储到pinia中
+            tokenStore.setToken(result.data)
+            //跳转到首页 路由完成跳转
+            router.push('/')
+        } else {
+            ElMessage.error(result.message || result.msg || '登录失败')
+        }
+    } catch (error) {
+        console.error('登录失败:', error)
+    }
 }
 
 //定义函数,清空数据模型的数据
@@ -91,7 +118,7 @@ const clearRegisterData = ()=>{
         <el-col :span="12" class="bg"></el-col>
         <el-col :span="6" :offset="3" class="form">
             <!-- 注册表单 -->
-            <el-form ref="form" size="large" autocomplete="off" v-if="isRegister" :model="registerData" :rules="rules">
+            <el-form ref="registerFormRef" size="large" autocomplete="off" v-if="isRegister" :model="registerData" :rules="rules">
                 <el-form-item>
                     <h1>注册</h1>
                 </el-form-item>
@@ -119,7 +146,7 @@ const clearRegisterData = ()=>{
                 </el-form-item>
             </el-form>
             <!-- 登录表单 -->
-            <el-form ref="form" size="large" autocomplete="off" v-else :model="registerData" :rules="rules">
+            <el-form ref="loginFormRef" size="large" autocomplete="off" v-else :model="registerData" :rules="rules">
                 <el-form-item>
                     <h1>登录</h1>
                 </el-form-item>

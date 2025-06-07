@@ -21,7 +21,6 @@ const store = useStore();
 
 const toolbar = computed(() => store.state.toolbar);
 const visiblecontrol = computed(() => store.state.visible);
-import Sider from '@/components/common/sider.vue'
 // # function
 // 改变颜色
 const changeColor = () => {

@@ -185,6 +185,72 @@ export const useChatStore = defineStore('chat', () => {
         }
     }
 
+    // 重命名会话
+    const renameSessionById = async (sessionId: number, newName: string) => {
+        loading.value = true
+        error.value = null
+        try {
+            const { code, message } = await renameSession(sessionId, newName)
+            if (code !== 0) throw new Error(message)
+            
+            // 更新本地会话列表
+            const sessionIndex = sessions.value.findIndex(s => s.id === sessionId)
+            if (sessionIndex !== -1) {
+                sessions.value[sessionIndex].sessionName = newName
+            }
+        } catch (err) {
+            handleError(err, '重命名会话失败')
+        } finally {
+            loading.value = false
+        }
+    }
+
+    // 删除会话
+    const deleteSessionById = async (sessionId: number) => {
+        loading.value = true
+        error.value = null
+        try {
+            const { code, message } = await deleteSession(sessionId)
+            if (code !== 0) throw new Error(message)
+            
+            // 从本地会话列表中移除
+            sessions.value = sessions.value.filter(s => s.id !== sessionId)
+            
+            // 如果删除的是当前会话，切换到其他会话或清空
+            if (currentSessionId.value === sessionId) {
+                if (sessions.value.length > 0) {
+                    await loadMessageHistory(sessions.value[0].id)
+                } else {
+                    currentSessionId.value = null
+                    messages.value = []
+                }
+            }
+        } catch (err) {
+            handleError(err, '删除会话失败')
+        } finally {
+            loading.value = false
+        }
+    }
+
+    // 清除会话历史
+    const clearHistory = async (sessionId: number) => {
+        loading.value = true
+        error.value = null
+        try {
+            const { code, message } = await clearSessionHistory(sessionId)
+            if (code !== 0) throw new Error(message)
+            
+            // 如果清除的是当前会话，清空本地消息
+            if (currentSessionId.value === sessionId) {
+                messages.value = []
+            }
+        } catch (err) {
+            handleError(err, '清除历史失败')
+        } finally {
+            loading.value = false
+        }
+    }
+
     return {
         currentUserId,
         sessions,
@@ -198,5 +264,8 @@ export const useChatStore = defineStore('chat', () => {
         loadMessageHistory,
         loadSessions,
         reset,
+        renameSessionById,
+        deleteSessionById,
+        clearHistory,
     }
 })

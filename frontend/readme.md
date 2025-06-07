@@ -1,7 +1,7 @@
 ## 安装依赖
 
 ```bash
-npm install pnpm
+npm install -g pnpm
 pnpm install
 ```
 

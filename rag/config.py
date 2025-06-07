@@ -7,7 +7,7 @@ MODEL_DIR = BASE_DIR / "all-MiniLM-L6-v2"
 VECTOR_STORE_PATH = BASE_DIR / "vector_store"
 
 # 文档根目录配置 - 用于动态检索文档的绝对路径前缀
-DOCUMENTS_ROOT_PATH = Path("E:/files")  # 修改为您的文档根路径
+DOCUMENTS_ROOT_PATH = Path("D:/files")  # 修改为您的文档根路径
 
 # 创建必要的目录
 VECTOR_STORE_PATH.mkdir(exist_ok=True)
@@ -34,8 +34,8 @@ FLASK_PORT = 5000
 FLASK_DEBUG = True
 
 # RAG配置
-CHUNK_SIZE = 500
-CHUNK_OVERLAP = 50
+CHUNK_SIZE = 800  # 增加切片大小以获取更多上下文信息
+CHUNK_OVERLAP = 150  # 增加重叠以保持更好的上下文连贯性
 TOP_K_RETRIEVAL = 5
 MAX_CONTEXT_LENGTH = 3000
 
@@ -59,4 +59,11 @@ GENERATION_CONFIG = {
 
 # RAG流水线启动配置
 STARTUP_INIT_RAG = os.getenv("STARTUP_INIT_RAG", "false").lower() == "true"  # 是否在启动时初始化RAG流水线
-WARMUP_ON_STARTUP = os.getenv("WARMUP_ON_STARTUP", "true").lower() == "true"  # 是否在启动时进行预热 
+WARMUP_ON_STARTUP = os.getenv("WARMUP_ON_STARTUP", "true").lower() == "true"  # 是否在启动时进行预热
+
+# 文档分割器配置
+TEXT_SPLITTER_CONFIG = {
+    "chunk_size": CHUNK_SIZE,
+    "chunk_overlap": CHUNK_OVERLAP,
+    "separators": ["\n\n", "\n", "。", ".", "？", "！", " ", ""]  # 中英文分隔符
+} 

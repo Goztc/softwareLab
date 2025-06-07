@@ -134,13 +134,35 @@
                   </div>
                 </div>
                 <div class="message-text">
-                  <template v-for="(block, index) in parseMessage(msg.content)" :key="index">
-                    <CodeBlock
-                      v-if="block.type === 'code'"
-                      :code="block.content"
-                      :language="block.language"
-                    />
-                    <div v-else v-html="block.content"></div>
+                  <template v-if="msg.role === 'assistant'">
+                    <!-- AI回复：解析JSON格式内容，使用Markdown渲染器 -->
+                    <MarkdownRenderer :content="extractAnswerFromAI(msg.content)" />
+                    
+                    <!-- 显示源文档信息 -->
+                    <div v-if="extractSourcesFromAI(msg.content).length > 0" class="sources-container">
+                      <div class="sources-header">
+                        <el-icon><Document /></el-icon>
+                        <span>参考文档</span>
+                      </div>
+                      <div class="sources-list">
+                        <div 
+                          v-for="(source, idx) in extractSourcesFromAI(msg.content)" 
+                          :key="idx" 
+                          class="source-item"
+                        >
+                          <div class="source-path">
+                            <el-icon><Files /></el-icon>
+                            <span>{{ source.source }}</span>
+                          </div>
+                          <div class="source-content">{{ source.content }}</div>
+                        </div>
+                      </div>
+                    </div>
+                  </template>
+                  
+                  <template v-else>
+                    <!-- 用户消息：使用Markdown渲染器 -->
+                    <MarkdownRenderer :content="msg.content" />
                   </template>
                 </div>
                 <div class="message-footer">
@@ -309,6 +331,7 @@ import { format } from 'date-fns'
 import { useDisplay } from 'vuetify'
 import { ElMessage } from 'element-plus'
 import CodeBlock from "@/components/chat/CodeBlock.vue"
+import MarkdownRenderer from "@/components/chat/MarkdownRenderer.vue"
 import { chatApi } from '@/api/chat'
 import { folderApi } from '@/api/folder'
 import type { MyFile, Folder as FolderType } from '@/types'
@@ -384,6 +407,28 @@ const parseMessage = (content: string) => {
   }
 
   return blocks
+}
+
+// 从AI回复的JSON中提取答案文本
+const extractAnswerFromAI = (content: string): string => {
+  try {
+    const parsed = JSON.parse(content)
+    return parsed.answer || parsed.response || content
+  } catch (error) {
+    // 如果解析失败，返回原始内容
+    return content
+  }
+}
+
+// 从AI回复的JSON中提取源文档信息
+const extractSourcesFromAI = (content: string): Array<{source: string, content: string}> => {
+  try {
+    const parsed = JSON.parse(content)
+    return parsed.sources || []
+  } catch (error) {
+    // 如果解析失败，返回空数组
+    return []
+  }
 }
 
 onMounted(async () => {
@@ -861,7 +906,7 @@ const clearCurrentSessionHistory = async () => {
 <style lang="scss" scoped>
 .chat-app-container {
   display: flex;
-  height: 100vh;
+  height: calc(100vh - 60px);
   background-color: #f5f9ff;
 
   .sidebar {
@@ -1272,7 +1317,7 @@ const clearCurrentSessionHistory = async () => {
 
   .file-sidebar {
     width: 300px;
-    height: 100vh;
+    height: calc(100vh - 60px);
     background-color: #f8fafe;
     border-left: 1px solid #e0e9ff;
     display: flex;
@@ -1559,6 +1604,68 @@ const clearCurrentSessionHistory = async () => {
       font-size: 14px;
       line-height: 1.5;
       color: #1a73e8;
+    }
+  }
+}
+
+// 源文档显示样式
+.sources-container {
+  margin-top: 16px;
+  padding: 12px;
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+  
+  .sources-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 12px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #495057;
+    
+    .el-icon {
+      color: #6c757d;
+    }
+  }
+  
+  .sources-list {
+    .source-item {
+      margin-bottom: 12px;
+      padding: 10px;
+      background: white;
+      border: 1px solid #e9ecef;
+      border-radius: 6px;
+      
+      &:last-child {
+        margin-bottom: 0;
+      }
+      
+      .source-path {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: 6px;
+        font-size: 12px;
+        font-weight: 500;
+        color: #0066cc;
+        
+        .el-icon {
+          color: #0066cc;
+          font-size: 14px;
+        }
+      }
+      
+      .source-content {
+        font-size: 13px;
+        color: #6c757d;
+        line-height: 1.4;
+        background: #f8f9fa;
+        padding: 6px 8px;
+        border-radius: 4px;
+        border-left: 3px solid #dee2e6;
+      }
     }
   }
 }

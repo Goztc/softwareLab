@@ -19,7 +19,7 @@ from langchain.prompts import PromptTemplate
 from langchain_community.chat_models import ChatTongyi
 
 # 本地导入
-from config import QWEN_API_KEY, QWEN_MODEL_NAME, EMBEDDING_MODEL_NAME
+from config import QWEN_API_KEY, QWEN_MODEL_NAME, EMBEDDING_MODEL_NAME, DOCUMENTS_ROOT_PATH, TEXT_SPLITTER_CONFIG
 
 class RAGPipeline:
     """RAG流水线类 - 基于LangChain实现，参考RAG-Tongyi.py优化"""
@@ -45,12 +45,13 @@ class RAGPipeline:
             encode_kwargs={'normalize_embeddings': True}
         )
         
-        # 初始化文本分割器
+        # 初始化文本分割器 - 使用配置文件中的参数
         self.text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=500,
-            chunk_overlap=100,  # 增加重叠以保持上下文
-            separators=["\n\n", "\n", "。", ".", " ", ""]
+            chunk_size=TEXT_SPLITTER_CONFIG["chunk_size"],
+            chunk_overlap=TEXT_SPLITTER_CONFIG["chunk_overlap"],
+            separators=TEXT_SPLITTER_CONFIG["separators"]
         )
+        print(f"📋 文本分割器配置: chunk_size={TEXT_SPLITTER_CONFIG['chunk_size']}, chunk_overlap={TEXT_SPLITTER_CONFIG['chunk_overlap']}")
         
         # 初始化提示模板 - 参考RAG-Tongyi.py的设计
         self.prompt_template = PromptTemplate(
@@ -77,10 +78,61 @@ class RAGPipeline:
         self.vector_store_root = Path("vector_stores")  # 向量存储根目录
         self.vector_store_root.mkdir(exist_ok=True)     # 确保目录存在
         
+        # 文档根路径配置
+        self.documents_root = Path(DOCUMENTS_ROOT_PATH)
+        
         # 初始化其他属性
         self.conversation_histories = {}
         
         print("✅ RAG流水线初始化成功（带缓存优化 + 持久化支持）")
+    
+    def _get_relative_path(self, absolute_path: str) -> str:
+        """
+        将绝对路径转换为相对于文档根目录的相对路径
+        
+        Args:
+            absolute_path: 绝对路径
+            
+        Returns:
+            相对路径字符串
+        """
+        try:
+            abs_path = Path(absolute_path)
+            # 如果路径在文档根目录下，返回相对路径
+            if abs_path.is_absolute() and self.documents_root in abs_path.parents or abs_path == self.documents_root:
+                relative_path = abs_path.relative_to(self.documents_root)
+                return str(relative_path).replace('\\', '/')  # 统一使用正斜杠
+            else:
+                # 如果不在文档根目录下，返回文件名
+                return abs_path.name
+        except (ValueError, OSError):
+            # 如果转换失败，返回原始路径的文件名部分
+            return Path(absolute_path).name
+    
+    def _extract_sources_from_docs(self, docs: List[Document]) -> List[dict]:
+        """
+        从文档列表中提取源文档信息，保留所有相关片段并转换为相对路径
+        
+        Args:
+            docs: 文档列表
+            
+        Returns:
+            源文档信息列表，包含content和source字段
+        """
+        sources = []
+        source_file_counts = {}  # 记录每个文件的片段数量
+        
+        for doc in docs:
+            source_info = doc.metadata.get("source", "Unknown")
+            relative_source = self._get_relative_path(source_info)
+            
+            
+            sources.append({
+                "content": doc.page_content[:50],  # 增加内容预览长度
+                "source": relative_source  # 保留原始文件路径
+            })
+        
+        return sources
     
     def _load_documents_from_path(self, document_paths) -> List[Document]:
         """从指定路径加载文档，支持多个路径"""
@@ -173,14 +225,7 @@ class RAGPipeline:
             
             # 重新生成源文档信息（这部分比较轻量）
             documents = self.document_cache[path_key]
-            sources_info = []
-            for doc in documents:
-                source_info = doc.metadata.get("source", "Unknown")
-                if source_info not in [s["source"] for s in sources_info]:
-                    sources_info.append({
-                        "content": doc.page_content,
-                        "source": source_info
-                    })
+            sources_info = self._extract_sources_from_docs(documents)
             
             return vectorstore, retriever, sources_info
         
@@ -205,14 +250,7 @@ class RAGPipeline:
                 documents = self._load_documents_from_path(document_path)
                 if documents:
                     self.document_cache[path_key] = documents
-                    sources_info = []
-                    for doc in documents:
-                        source_info = doc.metadata.get("source", "Unknown")
-                        if source_info not in [s["source"] for s in sources_info]:
-                            sources_info.append({
-                                "content": doc.page_content,
-                                "source": source_info
-                            })
+                    sources_info = self._extract_sources_from_docs(documents)
                     return vectorstore, retriever, sources_info
                 
                 print(f"✅ 从磁盘加载向量存储成功: {path_key}")
@@ -243,16 +281,7 @@ class RAGPipeline:
         retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
         
         # 生成源文档信息
-        sources_info = []
-        source_files = []
-        for doc in documents:
-            source_info = doc.metadata.get("source", "Unknown")
-            if source_info not in source_files:
-                source_files.append(source_info)
-                sources_info.append({
-                    "content": doc.page_content,
-                    "source": source_info
-                })
+        sources_info = self._extract_sources_from_docs(documents)
         
         # 缓存结果
         self.vectorstore_cache[path_key] = vectorstore
@@ -281,7 +310,7 @@ class RAGPipeline:
                 cache_dict.pop(path_key, None)
             print(f"🧹 已清除缓存: {path_key}")
     
-    def query(self, question: str, document_path, top_k: int = 3) -> dict:
+    def query(self, question: str, document_path, top_k: int = 5) -> dict:
         """
         查询文档并返回答案（使用缓存优化）
         
@@ -312,17 +341,12 @@ class RAGPipeline:
             # 执行查询
             result = retrieval_qa.invoke({"query": question})
             
+            # 获取源文档并添加调试信息
+            source_documents = result.get("source_documents", [])
+            print(f"🔍 检索到 {len(source_documents)} 个相关文档片段")
+            
             # 提取源文档信息
-            sources = []
-            source_files = []
-            for doc in result.get("source_documents", []):
-                source_info = doc.metadata.get("source", "Unknown")
-                if source_info not in source_files:
-                    source_files.append(source_info)
-                    sources.append({
-                        "content": doc.page_content,
-                        "source": source_info
-                    })
+            sources = self._extract_sources_from_docs(source_documents)
             
             return {
                 "question": question,
@@ -346,7 +370,7 @@ class RAGPipeline:
                 "sources": []
             }
     
-    def chat(self, question: str, document_path, history: Optional[List] = None, conversation_id: str = "default") -> dict:
+    def chat(self, question: str, document_path, history: Optional[List] = None, conversation_id: str = "default", top_k: int = 5) -> dict:
         """
         带历史对话的查询 - 真正的对话式RAG实现
         
@@ -355,6 +379,7 @@ class RAGPipeline:
             document_path: 文档路径（可以是字符串、列表。支持文件路径、文件夹路径或混合）
             history: 对话历史
             conversation_id: 对话ID，用于标识不同的对话会话
+            top_k: 返回最相关的文档数量
             
         Returns:
             包含答案和来源文档的字典
@@ -384,8 +409,11 @@ class RAGPipeline:
                     "conversation_id": conversation_id
                 }
             
-            # 检索相关文档
+            # 使用指定的top_k更新检索器并检索相关文档
+            retriever = vectorstore.as_retriever(search_kwargs={"k": top_k})
             retrieved_docs = retriever.get_relevant_documents(question)
+            
+            print(f"🔍 检索到 {len(retrieved_docs)} 个相关文档片段")
             
             # 构建上下文
             context = "\n\n".join([doc.page_content for doc in retrieved_docs])
@@ -427,16 +455,7 @@ class RAGPipeline:
                 answer = str(response)
             
             # 提取源文档信息
-            sources = []
-            source_files = []
-            for doc in retrieved_docs:
-                source_info = doc.metadata.get("source", "Unknown")
-                if source_info not in source_files:
-                    source_files.append(source_info)
-                    sources.append({
-                        "content": doc.page_content,
-                        "source": source_info
-                    })
+            sources = self._extract_sources_from_docs(retrieved_docs)
             
             # 添加当前对话到历史
             current_exchange = {
@@ -502,7 +521,7 @@ class RAGPipeline:
                 results.append({
                     "rank": i + 1,
                     "content": doc.page_content[:200] + "..." if len(doc.page_content) > 200 else doc.page_content,
-                    "source": doc.metadata.get("source", "Unknown"),
+                    "source": self._get_relative_path(doc.metadata.get("source", "Unknown")),
                     "score": score
                 })
             

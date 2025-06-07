@@ -3,7 +3,7 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://localhost:3306/go_ztc
     username: root
-    password: 123456
+    password: TAn20050308
   data:
     redis:
       host: localhost
@@ -15,7 +15,7 @@ spring:
 
 file:
   storage:
-    root: E://files
+    root: D://files
 
 mybatis:
   configuration:

@@ -22,12 +22,10 @@ export const fileApi = {
      * @param folderId 文件夹 Id
      */
     createText: (content: string, fileName: string, folderId: number): Promise<ApiResponse<MyFile>> => {
-        return request.post('/files/create-text', null, {
-            params: {
-                content: content,
-                fileName: fileName,
-                folderId: folderId
-            }
+        return request.post('/files/create-text', {
+            content: content,
+            fileName: fileName,
+            folderId: folderId
         })
     },
 

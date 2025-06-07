@@ -53,7 +53,7 @@ instance.interceptors.response.use(
         // 当业务状态码不为 0 时，表示操作失败
         // 使用 ElMessage 组件显示错误信息，优先使用服务器返回的 msg 字段
         // 如果 msg 字段不存在，则显示默认的错误信息 '服务异常'
-        ElMessage.error(response.data.msg || '服务异常');
+        ElMessage.error(response.data.message || response.data.msg || '服务异常');
         // 返回一个被拒绝的 Promise，将错误信息传递给调用者
         return Promise.reject(response.data);
     },

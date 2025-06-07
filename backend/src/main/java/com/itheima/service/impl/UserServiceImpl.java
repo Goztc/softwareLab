@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.itheima.mapper.UserMapper;
 import com.itheima.pojo.User;
+import com.itheima.service.FolderService;
 import com.itheima.service.UserService;
 import com.itheima.utils.Md5Util;
 import com.itheima.utils.ThreadLocalUtil;
@@ -18,6 +19,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class UserServiceImpl implements UserService {
     private final UserMapper userMapper;
+    private final FolderService folderService;
 
     @Override
     public User findByUserName(String username) {
@@ -34,6 +36,10 @@ public class UserServiceImpl implements UserService {
         user.setPassword(Md5Util.getMD5String(password));
         user.setCreateTime(LocalDateTime.now());
         userMapper.insert(user);
+        
+        // 用户注册成功后，自动创建用户文件目录
+        String folderName = "user_" + user.getId();
+        folderService.createFolder(user.getId(), 0L, folderName);
     }
 
     @Override

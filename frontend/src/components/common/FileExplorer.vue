@@ -622,7 +622,7 @@ const formatFileSize = (bytes?: number) => {
 <style lang="scss" scoped>
 .file-explorer {
   display: flex;
-  height: 100vh;
+  height: calc(100vh - 60px);
   background-color: var(--el-bg-color-page);
   font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
 }

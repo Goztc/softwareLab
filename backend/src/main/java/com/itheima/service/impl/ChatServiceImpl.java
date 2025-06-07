@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.nio.file.Paths;
 
 @Slf4j
 @Service
@@ -40,6 +41,9 @@ public class ChatServiceImpl implements ChatService {
 
     @Value("${rag.api.timeout:30}")
     private int ragTimeout;
+
+    @Value("${file.storage.root}")
+    private String fileStorageRoot;
 
     @Override
     @Transactional
@@ -75,8 +79,13 @@ public class ChatServiceImpl implements ChatService {
         // 调用RAG API获取回复
         String aiResponse = getAIResponse(userId, content, sessionId);
 
-        // 保存AI回复
-        return saveMessage(sessionId, userId, aiResponse, "assistant");
+        // 保存AI回复（保存完整响应到数据库）
+        ChatMessage assistantMessage = saveMessage(sessionId, userId, aiResponse, "assistant");
+        
+        // 为前端返回精简的响应（移除冗余字段）
+        assistantMessage.setContent(extractCoreResponseForFrontend(aiResponse));
+        
+        return assistantMessage;
     }
 
     @Override
@@ -104,8 +113,13 @@ public class ChatServiceImpl implements ChatService {
         // 调用RAG API获取回复（使用指定的文档路径）
         String aiResponse = getAIResponseWithDocuments(userId, content, sessionId, documentPaths);
 
-        // 保存AI回复
-        return saveMessage(sessionId, userId, aiResponse, "assistant");
+        // 保存AI回复（保存完整响应到数据库）
+        ChatMessage assistantMessage = saveMessage(sessionId, userId, aiResponse, "assistant");
+        
+        // 为前端返回精简的响应（移除冗余字段）
+        assistantMessage.setContent(extractCoreResponseForFrontend(aiResponse));
+        
+        return assistantMessage;
     }
 
     @Override
@@ -178,6 +192,198 @@ public class ChatServiceImpl implements ChatService {
         return message;
     }
 
+    /**
+     * 从AI回复的JSON格式中提取纯文本答案
+     * @param aiResponse AI回复的JSON字符串
+     * @return 纯文本答案
+     */
+    private String extractAnswerFromResponse(String aiResponse) {
+        try {
+            JSONObject responseJson = JSONObject.parseObject(aiResponse);
+            if (responseJson.containsKey("answer")) {
+                return responseJson.getString("answer");
+            } else if (responseJson.containsKey("response")) {
+                return responseJson.getString("response");
+            }
+        } catch (Exception e) {
+            // 如果解析失败，使用原始内容
+            log.debug("解析AI回复JSON失败，使用原始内容: {}", e.getMessage());
+        }
+        return aiResponse;
+    }
+
+    /**
+     * 根据文件的相对路径查找对应的逻辑路径
+     * @param userId 用户ID
+     * @param relativePath RAG返回的相对路径
+     * @return 逻辑路径（从根文件夹到文件的完整路径）
+     */
+    private String buildLogicalPath(Long userId, String relativePath) {
+        try {
+            // 将相对路径转换为绝对路径
+            String absolutePath = convertToAbsolutePath(relativePath);
+            
+            // 根据绝对路径查找文件记录
+            LambdaQueryWrapper<File> fileQuery = new LambdaQueryWrapper<>();
+            fileQuery.eq(File::getUserId, userId)
+                    .eq(File::getFilePath, absolutePath);
+            File file = fileMapper.selectOne(fileQuery);
+            
+            if (file == null) {
+                log.warn("未找到文件记录，absolutePath: {}, relativePath: {}, userId: {}", 
+                        absolutePath, relativePath, userId);
+                return relativePath; // 如果找不到文件记录，返回原始相对路径
+            }
+            
+            // 构建逻辑路径：从根文件夹到文件的完整路径
+            StringBuilder logicalPath = new StringBuilder();
+            
+            // 如果文件在根目录下（folderId为0），直接返回文件名
+            if (file.getFolderId() == 0) {
+                return file.getFileName();
+            }
+            
+            // 递归构建文件夹路径
+            String folderPath = buildFolderPath(file.getFolderId());
+            if (!folderPath.isEmpty()) {
+                logicalPath.append(folderPath).append("/");
+            }
+            logicalPath.append(file.getFileName());
+            
+            return logicalPath.toString();
+            
+        } catch (Exception e) {
+            log.error("构建逻辑路径失败，relativePath: {}, userId: {}", relativePath, userId, e);
+            return relativePath; // 出错时返回原始相对路径
+        }
+    }
+
+    /**
+     * 将相对路径转换为绝对路径
+     * @param relativePath 相对路径
+     * @return 绝对路径
+     */
+    private String convertToAbsolutePath(String relativePath) {
+        try {
+            // 确保文件存储根路径以正确的分隔符结尾
+            String normalizedRoot = fileStorageRoot.replace("//", "/").replace("\\", "/");
+            if (!normalizedRoot.endsWith("/")) {
+                normalizedRoot += "/";
+            }
+            
+            // 规范化相对路径
+            String normalizedRelative = relativePath.replace("\\", "/");
+            if (normalizedRelative.startsWith("/")) {
+                normalizedRelative = normalizedRelative.substring(1);
+            }
+            
+            // 组合成绝对路径
+            String absolutePath = Paths.get(normalizedRoot + normalizedRelative).toString();
+            
+            log.debug("路径转换: {} + {} = {}", normalizedRoot, normalizedRelative, absolutePath);
+            return absolutePath;
+            
+        } catch (Exception e) {
+            log.error("路径转换失败，relativePath: {}, fileStorageRoot: {}", relativePath, fileStorageRoot, e);
+            return relativePath;
+        }
+    }
+
+    /**
+     * 递归构建文件夹路径
+     * @param folderId 文件夹ID
+     * @return 从根文件夹到当前文件夹的路径
+     */
+    private String buildFolderPath(Long folderId) {
+        if (folderId == null || folderId == 0) {
+            return ""; // 根文件夹
+        }
+        
+        try {
+            Folder folder = folderMapper.selectById(folderId);
+            if (folder == null) {
+                log.warn("未找到文件夹记录，folderId: {}", folderId);
+                return "";
+            }
+            
+            // 递归获取父文件夹路径
+            String parentPath = buildFolderPath(folder.getParentId());
+            
+            if (parentPath.isEmpty()) {
+                return folder.getFolderName();
+            } else {
+                return parentPath + "/" + folder.getFolderName();
+            }
+            
+        } catch (Exception e) {
+            log.error("构建文件夹路径失败，folderId: {}", folderId, e);
+            return "";
+        }
+    }
+
+    /**
+     * 处理RAG响应，将相对路径转换为逻辑路径
+     * @param userId 用户ID
+     * @param ragResponse RAG API的原始响应（包含相对路径）
+     * @return 处理后的响应（包含逻辑路径）
+     */
+    private String processRagResponse(Long userId, String ragResponse) {
+        try {
+            JSONObject responseJson = JSONObject.parseObject(ragResponse);
+            
+            // 处理sources字段中的路径，将相对路径转换为逻辑路径
+            if (responseJson.containsKey("sources")) {
+                com.alibaba.fastjson.JSONArray sources = responseJson.getJSONArray("sources");
+                for (int i = 0; i < sources.size(); i++) {
+                    JSONObject source = sources.getJSONObject(i);
+                    if (source.containsKey("source")) {
+                        String relativePath = source.getString("source");
+                        String logicalPath = buildLogicalPath(userId, relativePath);
+                        source.put("source", logicalPath);
+                        log.debug("路径转换完成: {} -> {}", relativePath, logicalPath);
+                    }
+                }
+            }
+            
+            return responseJson.toJSONString();
+            
+        } catch (Exception e) {
+            log.error("处理RAG响应失败，userId: {}", userId, e);
+            return ragResponse; // 出错时返回原始响应
+        }
+    }
+
+    /**
+     * 提取核心响应信息用于前端展示（移除冗余字段）
+     * @param ragResponse 完整的RAG响应
+     * @return 精简的响应，只包含answer和sources
+     */
+    private String extractCoreResponseForFrontend(String ragResponse) {
+        try {
+            JSONObject responseJson = JSONObject.parseObject(ragResponse);
+            JSONObject coreResponse = new JSONObject();
+            
+            // 只保留核心字段
+            if (responseJson.containsKey("answer")) {
+                coreResponse.put("answer", responseJson.getString("answer"));
+            } else if (responseJson.containsKey("response")) {
+                coreResponse.put("answer", responseJson.getString("response"));
+            }
+            
+            if (responseJson.containsKey("sources")) {
+                coreResponse.put("sources", responseJson.getJSONArray("sources"));
+            } else {
+                coreResponse.put("sources", new com.alibaba.fastjson.JSONArray());
+            }
+            
+            return coreResponse.toJSONString();
+            
+        } catch (Exception e) {
+            log.error("提取核心响应失败", e);
+            return ragResponse; // 出错时返回原始响应
+        }
+    }
+
     private String getAIResponse(Long userId, String userInput, Long sessionId) {
         try {
             // 获取当前会话的历史消息
@@ -204,7 +410,7 @@ public class ChatServiceImpl implements ChatService {
                         if ("user".equals(userMsg.getRole()) && "assistant".equals(assistantMsg.getRole())) {
                             Map<String, Object> historyItem = new HashMap<>();
                             historyItem.put("question", userMsg.getContent());
-                            historyItem.put("answer", assistantMsg.getContent());
+                            historyItem.put("answer", extractAnswerFromResponse(assistantMsg.getContent()));
                             historyItem.put("timestamp", assistantMsg.getCreateTime().toString());
                             history.add(historyItem);
                             
@@ -232,18 +438,18 @@ public class ChatServiceImpl implements ChatService {
             
             log.info("RAG API response: {}", jsonResponse.toJSONString());
             
-            // 解析响应内容
-            if (jsonResponse.containsKey("answer")) {
-                return jsonResponse.getString("answer");
-            } else if (jsonResponse.containsKey("response")) {
-                return jsonResponse.getString("response");
+            // 解析响应内容 - 返回完整的JSON响应而不是只返回文本
+            if (jsonResponse.containsKey("answer") || jsonResponse.containsKey("response")) {
+                // 处理响应中的路径信息，将物理路径转换为逻辑路径
+                String processedResponse = processRagResponse(userId, jsonResponse.toJSONString());
+                return processedResponse;
             }
 
             log.error("Invalid RAG API response format: {}", jsonResponse);
-            return "抱歉，获取AI回复时发生错误";
+            return "{\"answer\":\"抱歉，获取AI回复时发生错误\",\"sources\":[]}";
         } catch (Exception e) {
             log.error("调用RAG API失败", e);
-            return "抱歉，AI服务暂时不可用，请稍后再试。";
+            return "{\"answer\":\"抱歉，AI服务暂时不可用，请稍后再试。\",\"sources\":[]}";
         }
     }
 
@@ -425,7 +631,7 @@ public class ChatServiceImpl implements ChatService {
                         if ("user".equals(userMsg.getRole()) && "assistant".equals(assistantMsg.getRole())) {
                             Map<String, Object> historyItem = new HashMap<>();
                             historyItem.put("question", userMsg.getContent());
-                            historyItem.put("answer", assistantMsg.getContent());
+                            historyItem.put("answer", extractAnswerFromResponse(assistantMsg.getContent()));
                             historyItem.put("timestamp", assistantMsg.getCreateTime().toString());
                             history.add(historyItem);
                             
@@ -454,18 +660,18 @@ public class ChatServiceImpl implements ChatService {
             log.info("RAG API response: {}", jsonResponse.toJSONString());
             log.info("使用的文档路径: {}", documentPaths);
             
-            // 解析响应内容
-            if (jsonResponse.containsKey("answer")) {
-                return jsonResponse.getString("answer");
-            } else if (jsonResponse.containsKey("response")) {
-                return jsonResponse.getString("response");
+            // 解析响应内容 - 返回完整的JSON响应而不是只返回文本
+            if (jsonResponse.containsKey("answer") || jsonResponse.containsKey("response")) {
+                // 处理响应中的路径信息，将物理路径转换为逻辑路径
+                String processedResponse = processRagResponse(userId, jsonResponse.toJSONString());
+                return processedResponse;
             }
 
             log.error("Invalid RAG API response format: {}", jsonResponse);
-            return "抱歉，获取AI回复时发生错误";
+            return "{\"answer\":\"抱歉，获取AI回复时发生错误\",\"sources\":[]}";
         } catch (Exception e) {
             log.error("调用RAG API失败", e);
-            return "抱歉，AI服务暂时不可用，请稍后再试。";
+            return "{\"answer\":\"抱歉，AI服务暂时不可用，请稍后再试。\",\"sources\":[]}";
         }
     }
 

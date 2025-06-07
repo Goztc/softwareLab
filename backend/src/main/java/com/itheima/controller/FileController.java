@@ -1,6 +1,7 @@
 // FileController.java
 package com.itheima.controller;
 
+import com.itheima.dto.CreateTextFileRequest;
 import com.itheima.pojo.File;
 import com.itheima.pojo.Result;
 import com.itheima.service.FileService;
@@ -52,13 +53,10 @@ public class FileController {
     }
 
     @PostMapping("/create-text")
-    public Result<File> createTextFile(
-            @RequestParam String content,
-            @RequestParam String fileName,
-            @RequestParam(defaultValue = "0") Long folderId) throws IOException {
+    public Result<File> createTextFile(@RequestBody CreateTextFileRequest request) throws IOException {
         Long userId = getCurrentUserId();
 
-        File createdFile = fileService.createTextFile(userId, folderId, fileName, content);
+        File createdFile = fileService.createTextFile(userId, request.getFolderId(), request.getFileName(), request.getContent());
         return Result.success(createdFile);
     }
 
