@@ -1,0 +1,173 @@
+@startuml 系统部署模型
+
+' 设置高清输出参数
+skinparam dpi 300
+
+!theme plain
+' 设置中文字体支持和字体大小
+skinparam defaultFontName "Microsoft YaHei,SimHei,Arial Unicode MS,sans-serif"
+skinparam defaultFontSize 12
+skinparam titleFontSize 16
+skinparam componentFontSize 11
+skinparam noteFontSize 10
+
+skinparam backgroundColor #FEFEFE
+skinparam node {
+    BackgroundColor #E3F2FD
+    BorderColor #1976D2
+    BorderThickness 2
+}
+' 设置不同层级的节点颜色
+skinparam node<<server>> {
+    BackgroundColor #F3E5F5
+    BorderColor #7B1FA2
+    BorderThickness 3
+}
+skinparam artifact {
+    BackgroundColor #F1F8E9
+    BorderColor #388E3C
+    BorderThickness 1
+}
+skinparam component {
+    BackgroundColor #FFF3E0
+    BorderColor #F57C00
+    BorderThickness 1
+}
+skinparam database {
+    BackgroundColor #FCE4EC
+    BorderColor #C2185B
+    BorderThickness 2
+}
+
+title 知识管理RAG智能问答系统 - 部署模型图
+
+' 开发机器/单机部署
+node "开发服务器\n(localhost)" as DevServer <<server>> {
+    
+    ' 前端开发服务器
+    node "前端开发服务器" as FrontendServer {
+        artifact "Vue3前端应用\n(frontend/)" as VueApp
+        component "Vite开发服务器\n:3000" as ViteServer
+    }
+    
+    ' 后端应用服务器  
+    node "后端应用服务器" as BackendServer {
+        artifact "Spring Boot应用\n(backend/)" as SpringApp
+        component "内嵌Tomcat\n:8080" as Tomcat
+        component "JVM运行环境" as JVM
+    }
+    
+    ' RAG AI服务器
+    node "RAG AI服务器" as AIServer {
+        artifact "Python Flask应用\n(rag/app.py)" as FlaskApp
+        component "Flask开发服务器\n:5000" as FlaskServer
+        component "Python 3.11环境" as Python
+        component "向量存储\n(vector_store/)" as VectorStore
+        component "AI模型\n(all-MiniLM-L6-v2/)" as AIModel
+    }
+    
+    ' 数据库服务
+    node "数据库服务" as DatabaseServices {
+        database "MySQL 8.0\n(localhost:3306)" as MySQL
+        database "Redis\n(localhost:6379)" as Redis
+    }
+    
+    ' 文件存储
+    node "文件存储" as FileStorage {
+        component "本地文件系统\n(D://files)" as LocalFileSystem
+    }
+}
+
+' 外部AI服务
+cloud "外部AI服务" as ExternalAI {
+    component "通义千问API\n(Qwen-Plus)" as QwenAPI
+}
+
+' 外部云存储服务（可选）
+cloud "外部云存储服务\n(可选/待实现)" as ExternalStorage {
+    component "阿里云OSS\n(可选)" as AliyunOSS
+    component "腾讯云COS\n(可选)" as TencentCOS
+}
+
+' 网络连接关系 - 开发环境
+ViteServer --> Tomcat : "代理请求\nHTTP/8080"
+Tomcat --> MySQL : "JDBC\nTCP/3306"
+Tomcat --> Redis : "连接池\nTCP/6379"
+Tomcat --> FlaskServer : "RAG API\nHTTP/5000"
+Tomcat --> LocalFileSystem : "文件I/O\n(D://files)"
+LocalFileSystem -.-> AliyunOSS : "备份同步\n(可选/待实现)"
+LocalFileSystem -.-> TencentCOS : "备份同步\n(可选/待实现)"
+FlaskServer --> QwenAPI : "HTTPS API\n(通义千问)"
+FlaskServer --> VectorStore : "向量存储"
+FlaskServer --> AIModel : "模型推理"
+
+' 客户端访问
+actor "用户" as User
+User --> ViteServer : "浏览器访问\nHTTP/3000"
+
+' 部署说明
+note top of FrontendServer
+    前端开发服务器
+    • Vue3 + Vite开发环境
+    • 热重载支持
+    • 代理API请求到后端
+    • 端口：3000
+end note
+
+note top of BackendServer
+    后端应用服务器
+    • Spring Boot应用
+    • 内嵌Tomcat容器
+    • RESTful API接口
+    • 端口：8080
+end note
+
+note top of AIServer
+    RAG AI服务器
+    • Python Flask应用
+    • 向量存储和检索
+    • 本地AI模型推理
+    • 端口：5000
+end note
+
+note top of DatabaseServices
+    数据库服务
+    • MySQL：用户数据、会话记录
+    • Redis：缓存和会话管理
+    • 本地数据库实例
+end note
+
+note top of FileStorage
+    文件存储系统
+    • 本地文件系统
+    • 文档上传存储
+    • 路径：D://files
+end note
+
+note top of ExternalAI
+    外部AI服务
+    • 通义千问API
+    • 智能问答生成
+    • HTTPS API调用
+end note
+
+note top of ExternalStorage
+    外部云存储服务
+    • 阿里云OSS（可选）
+    • 腾讯云COS（可选）
+    • 文件备份和同步
+    • 待实现功能
+end note
+
+' 部署特性说明
+note bottom
+    开发环境部署特性：
+    • 单机本地部署，便于开发调试
+    • 前后端分离架构
+    • 三服务端口分离：Vue(3000)、Spring Boot(8080)、Flask(5000)
+    • 本地数据库和文件存储
+    • 集成外部AI服务API
+    • 支持热重载和实时调试
+end note
+
+@enduml

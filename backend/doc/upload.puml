@@ -1,0 +1,138 @@
+@startuml 上传文档的事件流
+
+!theme plain
+' 设置高清输出参数
+skinparam dpi 300
+scale 3600 width
+scale 2400 height
+
+' 设置中文字体支持和字体大小
+skinparam defaultFontName "Microsoft YaHei,SimHei,Arial Unicode MS,sans-serif"
+skinparam defaultFontSize 12
+skinparam titleFontSize 16
+skinparam participantFontSize 12
+skinparam noteFontSize 10
+
+skinparam backgroundColor #FEFEFE
+skinparam participant {
+    BackgroundColor #E8F5E8
+    BorderColor #2E7D32
+    BorderThickness 2
+}
+skinparam note {
+    BackgroundColor #FFF3E0
+    BorderColor #F57C00
+    BorderThickness 1
+}
+skinparam arrow {
+    Color #1976D2
+    FontColor #1976D2
+    Thickness 2
+}
+
+title 上传文档的事件流时序图
+
+actor "知识管理用户" as User
+participant "文档管理界面\n(DocumentManagementInterface)" as UI
+participant "文件控制器\n(FileController)" as FileController
+participant "文件服务\n(FileService)" as FileService
+participant "向量存储事件监听器\n(VectorStoreEventListener)" as EventListener
+participant "RAG客户端服务\n(RagClientService)" as RagService
+entity "文件\n(File)" as FileEntity
+entity "用户\n(User)" as UserEntity
+
+== 进入上传界面 ==
+User -> UI: 登录系统后，进入文档管理界面
+UI -> User: 显示文档管理界面
+User -> UI: 点击"上传文档"按钮
+
+== 显示上传界面 ==
+UI -> User: 显示上传界面，支持选择多格式文档\n(PDF、DOCX、TXT等)
+
+== 选择并上传文档 ==
+User -> UI: 选择一个或多个文档
+User -> UI: 点击"确认上传"
+
+== 文档验证与存储 ==
+UI -> FileController: POST /files/upload\n(file: MultipartFile, folderId: Long)
+activate FileController
+
+FileController -> FileController: getCurrentUserId()
+note right: 从ThreadLocal获取当前用户ID
+
+FileController -> FileService: uploadFile(userId, folderId, file)
+activate FileService
+
+FileService -> FileService: validateFolderAccess(userId, folderId)
+note right: 验证文件夹访问权限
+
+FileService -> FileService: createStoragePath(userId)
+note right: 创建用户存储路径
+
+FileService -> FileService: generateUniqueFilename(fileName)
+note right: 生成唯一文件名
+
+FileService -> FileService: validateFileFormat()
+note right: 验证文档格式和大小
+
+FileService -> FileService: saveFileToDisk(file, targetPath)
+note right: 保存文件到磁盘
+
+FileService -> FileEntity: buildFileEntity()
+activate FileEntity
+FileEntity -> FileService: 返回File实体
+deactivate FileEntity
+
+FileService -> FileService: baseMapper.insert(fileEntity)
+note right: 保存文件元数据到数据库
+
+== 触发向量存储重建 ==
+FileService -> EventListener: onFileUploaded(userId)
+activate EventListener
+
+EventListener -> RagService: buildVectorStoreAsync(userId, true)
+activate RagService
+note right: 异步重建向量存储
+RagService --> EventListener: 异步处理
+deactivate RagService
+
+EventListener --> FileService: 事件处理完成
+deactivate EventListener
+
+FileService -> FileController: 返回上传成功的文件信息
+deactivate FileService
+
+FileController -> UI: 返回Result<File>
+deactivate FileController
+
+== 更新界面显示 ==
+UI -> UI: 更新文档列表
+UI -> UI: 更新文件夹视图
+UI -> User: 显示上传成功提示
+
+== 可选：在线编辑文档 ==
+alt 用户选择在线编辑
+    User -> UI: 选择在线编辑文档
+    UI -> FileController: POST /files/create-text
+    FileController -> FileService: createTextFile(userId, folderId, fileName, content)
+    FileService -> FileService: 保存为.txt格式
+    FileService -> EventListener: onFileCreated(userId)
+    EventListener -> RagService: buildVectorStoreAsync(userId, true)
+    FileService -> FileController: 返回创建的文件
+    FileController -> UI: 返回Result<File>
+    UI -> User: 显示编辑成功
+end
+
+== 退出上传界面 ==
+User -> UI: 选择退出上传界面
+UI -> User: 返回文档管理界面
+
+note over User, RagService
+    后置条件：
+    - 文档成功上传至系统并显示在文档列表中
+    - 向量存储异步重建，支持后续智能问答
+    - 文件元数据保存到数据库
+    - 物理文件存储到指定路径
+end note
+
+@enduml

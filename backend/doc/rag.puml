@@ -1,0 +1,150 @@
+@startuml 提交问题并查看回答的事件流
+
+' 设置高清输出参数
+skinparam dpi 300
+scale 3600 width
+scale 2400 height
+
+
+!theme plain
+' 设置中文字体支持和字体大小
+skinparam defaultFontName "Microsoft YaHei,SimHei,Arial Unicode MS,sans-serif"
+skinparam defaultFontSize 12
+skinparam titleFontSize 16
+skinparam participantFontSize 12
+skinparam noteFontSize 10
+
+skinparam backgroundColor #FEFEFE
+skinparam participant {
+    BackgroundColor #E8F5E8
+    BorderColor #2E7D32
+    BorderThickness 2
+}
+skinparam note {
+    BackgroundColor #FFF8E1
+    BorderColor #F57F17
+    BorderThickness 1
+}
+skinparam arrow {
+    Color #1976D2
+    Thickness 2
+}
+
+title 提交问题并查看回答的事件流时序图
+
+actor "知识管理用户" as User
+participant "智能问答界面\n(IntelligentQAInterface)" as UI
+participant "聊天控制器\n(ChatController)" as ChatController
+participant "聊天服务\n(ChatService)" as ChatService
+participant "RAG智能问答系统\n(RagClientService)" as RagService
+entity "聊天会话\n(ChatSession)" as SessionEntity
+entity "聊天消息\n(ChatMessage)" as MessageEntity
+entity "用户\n(User)" as UserEntity
+
+== 进入问答界面 ==
+User -> UI: 登录系统后，进入问答界面
+UI -> User: 显示问答界面和历史会话列表
+
+== 输入问题 ==
+User -> UI: 输入自然语言问题
+note right: 用户可在问题输入框中输入任意自然语言问题
+
+== 可选：指定文档范围 ==
+alt 用户选择指定文档或文件夹
+    User -> UI: 选择指定文档或文件夹作为回答范围
+    UI -> User: 显示已选择的文档/文件夹列表
+    User -> UI: 点击"提交"
+end
+
+== 提交问题 ==
+User -> UI: 点击发送或按回车提交问题
+
+UI -> ChatController: POST /chat/messages\n(sessionId, content, fileIds?, folderIds?)
+activate ChatController
+
+ChatController -> ChatController: getCurrentUserId()
+note right: 从ThreadLocal获取当前用户ID
+
+== 验证会话 ==
+ChatController -> ChatService: sendMessage(sessionId, userId, content, fileIds?, folderIds?)
+activate ChatService
+
+ChatService -> SessionEntity: validateSession(sessionId, userId)
+activate SessionEntity
+SessionEntity -> ChatService: 验证会话归属权限
+deactivate SessionEntity
+
+== 保存用户消息 ==
+ChatService -> MessageEntity: saveMessage(sessionId, userId, content, "user")
+activate MessageEntity
+MessageEntity -> ChatService: 返回用户消息记录
+deactivate MessageEntity
+
+== 收集文档路径 ==
+ChatService -> ChatService: collectDocumentPaths(userId, fileIds, folderIds)
+note right: 根据指定的文件和文件夹ID\n收集所有相关文档路径
+
+== 调用RAG系统 ==
+ChatService -> RagService: POST /chat\n{message, document_path, conversation_id, history}
+activate RagService
+
+RagService -> RagService: 基于RAG技术检索相关内容
+note right: 从指定文档中检索相关内容\n生成智能回答和引用来源
+
+alt 找到相关文档
+    RagService -> ChatService: 返回智能回答和引用来源\n{answer, sources: [{source, content}]}
+else 未找到相关文档
+    RagService -> ChatService: 返回错误提示\n"未找到相关内容，请检查问题或上传更多文档"
+end
+deactivate RagService
+
+== 处理回答内容 ==
+ChatService -> ChatService: processRagResponse(userId, ragResponse)
+note right: 将物理路径转换为逻辑路径\n便于前端显示
+
+== 保存AI回答 ==
+ChatService -> MessageEntity: saveMessage(sessionId, userId, aiResponse, "assistant")
+activate MessageEntity
+MessageEntity -> ChatService: 返回AI回答记录
+deactivate MessageEntity
+
+== 更新会话时间 ==
+ChatService -> SessionEntity: updateSessionTime(sessionId)
+activate SessionEntity
+SessionEntity -> ChatService: 更新会话的最后活动时间
+deactivate SessionEntity
+
+ChatService -> ChatController: 返回AI回答消息
+deactivate ChatService
+
+ChatController -> UI: 返回Result<ChatMessage>
+deactivate ChatController
+
+== 显示回答内容 ==
+UI -> UI: 解析AI回答的JSON格式
+UI -> User: 显示回答内容 (markdown渲染)
+UI -> User: 显示引用来源\n(文档名称和段落内容)
+
+== 保存会话记录 ==
+UI -> UI: 自动保存会话记录到本地存储
+note right: 用户可随时查看历史问答
+
+== 继续对话或结束 ==
+alt 用户选择继续提问
+    User -> UI: 输入新的问题
+    note right: 系统保持会话上下文\n支持多轮对话
+else 用户选择结束会话
+    User -> UI: 关闭问答界面或切换到其他功能
+    UI -> User: 保存会话记录，返回主界面
+end
+
+note over User, RagService
+    后置条件：
+    - 用户获得基于RAG技术的智能回答
+    - 显示相关文档的引用来源信息
+    - 会话记录自动保存，支持历史查看
+    - 支持指定文档范围的精准问答
+    - 保持多轮对话的上下文连贯性
+end note
+
+@enduml

@@ -1,0 +1,65 @@
+@startuml class
+!theme plain
+skinparam defaultFontName "Microsoft YaHei,SimHei,Arial Unicode MS,sans-serif"
+title LLM Hub Analysis Class Diagram
+
+left to right direction
+
+actor User
+actor ProUser  
+actor PaidUser
+
+together {
+    package "边界类" {
+        boundary LoginUI
+        boundary ChatUI  
+        boundary FileUploadUI
+        boundary SessionUI
+        boundary ModelUI
+        boundary LLMAPI
+    }
+
+    package "控制类" {
+        control AuthController
+        control ChatController
+        control FileController  
+        control SessionController
+        control ModelController
+    }
+
+    package "实体类" {
+        entity UserEntity
+        entity Conversation
+        entity Message
+        entity Document
+        entity AIModel
+    }
+}
+
+User -- LoginUI
+User -- ChatUI
+User -- SessionUI
+
+ProUser -- FileUploadUI
+PaidUser -- ModelUI
+
+LoginUI -- AuthController
+ChatUI -- ChatController
+FileUploadUI -- FileController
+SessionUI -- SessionController
+ModelUI -- ModelController
+ChatController -- LLMAPI
+
+AuthController -- UserEntity
+ChatController -- Conversation
+ChatController -- Message
+FileController -- Document
+SessionController -- Conversation
+ModelController -- AIModel
+
+UserEntity -- Conversation
+Conversation -- Message
+Conversation -- Document
+AIModel -- Conversation
+
+@enduml 

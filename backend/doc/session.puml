@@ -1,0 +1,200 @@
+@startuml 管理会话的事件流
+
+' 设置高清输出参数
+skinparam dpi 300
+scale 3600 width
+scale 2400 height
+
+!theme plain
+' 设置中文字体支持和字体大小
+skinparam defaultFontName "Microsoft YaHei,SimHei,Arial Unicode MS,sans-serif"
+skinparam defaultFontSize 12
+skinparam titleFontSize 16
+skinparam participantFontSize 12
+skinparam noteFontSize 10
+
+skinparam backgroundColor #FEFEFE
+skinparam participant {
+    BackgroundColor #F3E5F5
+    BorderColor #7B1FA2
+    BorderThickness 2
+}
+skinparam note {
+    BackgroundColor #E8F5E8
+    BorderColor #388E3C
+    BorderThickness 1
+}
+skinparam arrow {
+    Color #1976D2
+    Thickness 2
+}
+
+title 管理会话的事件流时序图
+
+actor "知识管理用户" as User
+participant "智能问答界面\n(IntelligentQAInterface)" as UI
+participant "聊天控制器\n(ChatController)" as ChatController
+participant "聊天服务\n(ChatService)" as ChatService
+entity "聊天会话\n(ChatSession)" as SessionEntity
+entity "聊天消息\n(ChatMessage)" as MessageEntity
+entity "用户\n(User)" as UserEntity
+
+== 进入会话管理界面 ==
+User -> UI: 登录系统后，进入会话管理界面
+UI -> ChatController: GET /chat/sessions
+activate ChatController
+
+ChatController -> ChatController: getCurrentUserId()
+note right: 从ThreadLocal获取当前用户ID
+
+ChatController -> ChatService: getUserSessions(userId)
+activate ChatService
+
+ChatService -> SessionEntity: 查询用户所有会话
+activate SessionEntity
+SessionEntity -> ChatService: 返回会话列表（按更新时间倒序）
+deactivate SessionEntity
+
+ChatService -> ChatController: 返回会话列表
+deactivate ChatService
+
+ChatController -> UI: 返回Result<List<ChatSession>>
+deactivate ChatController
+
+== 显示会话历史 ==
+UI -> UI: 按时间分类会话列表
+note right: 根据createTime和updateTime分类：\n最近一天、最近五天、更早
+
+alt 存在会话记录
+    UI -> User: 显示按时间分类的会话列表\n包含会话时间、问题摘要和关联文档
+    note right: 每个会话显示：\n- 会话名称\n- 创建/更新时间\n- 最后一条消息预览
+else 无会话记录
+    UI -> User: 显示提示信息\n"暂无会话记录，请提交问题开始新会话"
+end
+
+User -> UI: 点击"查看会话历史"
+
+== 继续会话对话 ==
+alt 用户选择继续某个会话
+    User -> UI: 选择某个会话并点击
+    UI -> ChatController: GET /chat/messages?sessionId={sessionId}
+    activate ChatController
+    
+    ChatController -> ChatService: getMessageHistory(sessionId)
+    activate ChatService
+    
+    ChatService -> MessageEntity: 查询会话历史消息
+    activate MessageEntity
+    MessageEntity -> ChatService: 返回消息列表（按时间升序）
+    deactivate MessageEntity
+    
+    ChatService -> ChatController: 返回消息历史
+    deactivate ChatService
+    
+    ChatController -> UI: 返回Result<List<ChatMessage>>
+    deactivate ChatController
+    
+    UI -> User: 显示会话历史消息
+    
+    User -> UI: 输入新问题
+    UI -> ChatController: POST /chat/messages\n(sessionId, content)
+    activate ChatController
+    
+    ChatController -> ChatService: sendMessage(sessionId, userId, content)
+    activate ChatService
+    
+    ChatService -> ChatService: 基于RAG技术生成回答并显示引用来源
+    note right: 调用RAG智能问答系统\n从指定文档中检索相关内容
+    
+    ChatService -> MessageEntity: 保存新问题和回答
+    activate MessageEntity
+    MessageEntity -> ChatService: 返回保存的消息
+    deactivate MessageEntity
+    
+    ChatService -> SessionEntity: 更新会话记录到"最近一天"
+    activate SessionEntity
+    SessionEntity -> ChatService: 更新会话的updateTime
+    deactivate SessionEntity
+    
+    ChatService -> ChatController: 返回AI回答
+    deactivate ChatService
+    
+    ChatController -> UI: 返回Result<ChatMessage>
+    deactivate ChatController
+    
+    UI -> User: 显示AI回答和引用来源
+end
+
+== 删除会话 ==
+alt 用户选择删除某个会话
+    User -> UI: 点击某个会话的"删除"按钮
+    UI -> User: 弹出确认对话框
+    User -> UI: 确认删除
+    
+    UI -> ChatController: DELETE /chat/sessions/{sessionId}
+    activate ChatController
+    
+    ChatController -> ChatService: deleteSession(sessionId)
+    activate ChatService
+    
+    ChatService -> MessageEntity: 删除会话相关的所有消息
+    activate MessageEntity
+    MessageEntity -> ChatService: 删除成功
+    deactivate MessageEntity
+    
+    ChatService -> SessionEntity: 删除会话记录
+    activate SessionEntity
+    SessionEntity -> ChatService: 删除成功
+    deactivate SessionEntity
+    
+    ChatService -> ChatController: 返回删除结果
+    deactivate ChatService
+    
+    ChatController -> UI: 返回Result<String>("会话删除成功")
+    deactivate ChatController
+    
+    UI -> UI: 从会话列表中移除该会话
+    UI -> User: 更新会话列表显示
+end
+
+== 重命名会话 ==
+alt 用户选择重命名某个会话
+    User -> UI: 双击会话名称进入编辑模式
+    User -> UI: 输入新的会话名称
+    User -> UI: 确认修改
+    
+    UI -> ChatController: PUT /chat/sessions/{sessionId}\n{sessionName: newName}
+    activate ChatController
+    
+    ChatController -> ChatService: renameSession(sessionId, newName)
+    activate ChatService
+    
+    ChatService -> SessionEntity: 更新会话名称和更新时间
+    activate SessionEntity
+    SessionEntity -> ChatService: 返回更新后的会话
+    deactivate SessionEntity
+    
+    ChatService -> ChatController: 返回更新后的会话
+    deactivate ChatService
+    
+    ChatController -> UI: 返回Result<ChatSession>
+    deactivate ChatController
+    
+    UI -> UI: 更新本地会话列表
+    UI -> User: 显示新的会话名称
+end
+
+== 退出会话管理界面 ==
+User -> UI: 选择退出会话管理界面
+UI -> User: 返回主界面或其他功能页面
+
+note over User, SessionEntity
+    后置条件：
+    - 用户查看或更新会话记录成功
+    - 会话按时间分类更新（最近一天、最近五天、更早）
+    - 删除操作正确反映在会话列表中
+    - 新问题和回答自动归类到"最近一天"
+    - 会话历史记录保持完整性和一致性
+end note
+
+@enduml
