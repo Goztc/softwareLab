@@ -11,6 +11,8 @@ import com.itheima.utils.ThreadLocalUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -20,6 +22,7 @@ import java.util.Map;
 public class UserServiceImpl implements UserService {
     private final UserMapper userMapper;
     private final FolderService folderService;
+    private static final Logger log = LoggerFactory.getLogger(UserServiceImpl.class);
 
     @Override
     public User findByUserName(String username) {
@@ -65,10 +68,14 @@ public class UserServiceImpl implements UserService {
     public void updatePwd(String newPwd) {
         Map<String, Object> map = ThreadLocalUtil.get();
         Long id = ((Integer) map.get("id")).longValue(); // 转换为Long类型
+        log.info("开始更新用户密码，用户ID: {}", id);
 
         LambdaUpdateWrapper<User> updateWrapper = new LambdaUpdateWrapper<>();
         updateWrapper.eq(User::getId, id)
                 .set(User::getPassword, Md5Util.getMD5String(newPwd));
-        userMapper.update(null, updateWrapper);
+        
+        log.info("构建更新条件: {}", updateWrapper.getSqlSet());
+        int rows = userMapper.update(null, updateWrapper);
+        log.info("密码更新完成，影响行数: {}", rows);
     }
 }

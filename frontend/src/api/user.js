@@ -50,3 +50,12 @@ export const userAvatarUpdateService = (avatarUrl) => {
 export const updateUserCommentService = (data) => {
     return request.put('/user/comment', data)
 }
+
+//修改密码
+export const userPasswordUpdateService = (passwordData) => {
+    return request.patch('/user/updatePwd', {
+        old_pwd: passwordData.oldPassword,
+        new_pwd: passwordData.newPassword,
+        re_pwd: passwordData.confirmPassword
+    })
+}

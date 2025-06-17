@@ -185,12 +185,6 @@ const handleCommand = (command)=>{
                 message: '用户取消了退出登录',
             })
         })
-    }else if(command === 'avatar'){
-        ElMessage({
-            type: 'success',
-            message: 'avatar',
-        })
-        store.commit('changeVisibility', { avatar: !visiblecontrol.value.avatar });
     }else if(command === 'info'){
         ElMessage({
             type: 'success',
@@ -243,8 +237,7 @@ const handleCommand = (command)=>{
               </li>
               <template #dropdown>
                 <el-dropdown-menu>
-                  <el-dropdown-item command="info" :icon="User">基本资料</el-dropdown-item>
-                  <el-dropdown-item command="avatar" :icon="Crop">更换头像</el-dropdown-item>
+                  <el-dropdown-item command="info" :icon="User">修改密码</el-dropdown-item>
                   <el-dropdown-item command="logout" :icon="SwitchButton">退出登录</el-dropdown-item>
                 </el-dropdown-menu>
               </template>

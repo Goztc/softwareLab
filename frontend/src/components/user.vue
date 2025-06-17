@@ -35,14 +35,9 @@
           <div class="page-container">
             <div class="recent-posts">
               <div class="container">
-
-                <div>
-                  <AvatarUploader v-if="visible.avatar" />
-                </div>
                 <div>
                   <UserInfoForm v-if="visible.info" />
                 </div>
-
               </div>
 
               <div>
@@ -70,7 +65,6 @@ import Printer from '@/components/common/printer.vue';
 import { useRouter } from 'vue-router';
 // 新增 `ResourceCardList` 组件导入
 import ResourceCardList from '@/components/common/ResourceCardList.vue';
-import AvatarUploader from '@/components/common/AvatarUploader.vue';
 import UserInfoForm from '@/components/common/UserInfoForm.vue';
 const loading = ref(false);
 const router = useRouter();

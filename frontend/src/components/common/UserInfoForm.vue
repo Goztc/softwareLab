@@ -2,66 +2,101 @@
   <el-card class="page-container">
     <template #header>
       <div class="header">
-        <span>基本资料</span>
+        <span>修改密码</span>
       </div>
     </template>
     <el-row>
-        <el-col :span="20">
-        <el-form :model="userInfo" :rules="rules" label-width="100px" size="large">
-            <el-form-item label="登录名称">
-            <el-input v-model="userInfo.username" disabled style="width: 100%;"></el-input>
-            </el-form-item>
-            <el-form-item label="用户昵称" prop="nickname">
-            <el-input v-model="userInfo.nickname" style="width: 100%;"></el-input>
-            </el-form-item>
-            <el-form-item label="用户邮箱" prop="email">
-            <el-input v-model="userInfo.email" style="width: 100%;"></el-input>
-            </el-form-item>
-            <el-form-item label="用户身份" prop="identity">
-              <el-select v-model="userInfo.identity" placeholder="请选择用户身份" style="width: 100%;">
-                <el-option label="医生" value="doctor"></el-option>
-                <el-option label="病人" value="patient"></el-option>
-              </el-select>
-            </el-form-item>
-            <el-form-item>
-            <el-button type="primary" @click="updateUserInfo">提交修改</el-button>
-            </el-form-item>
+      <el-col :span="20">
+        <el-form :model="passwordForm" :rules="rules" ref="passwordFormRef" label-width="100px" size="large">
+          <el-form-item label="原密码" prop="oldPassword">
+            <el-input v-model="passwordForm.oldPassword" type="password" show-password style="width: 100%;"></el-input>
+          </el-form-item>
+          <el-form-item label="新密码" prop="newPassword">
+            <el-input v-model="passwordForm.newPassword" type="password" show-password style="width: 100%;"></el-input>
+          </el-form-item>
+          <el-form-item label="确认密码" prop="confirmPassword">
+            <el-input v-model="passwordForm.confirmPassword" type="password" show-password style="width: 100%;"></el-input>
+          </el-form-item>
+          <el-form-item>
+            <el-button type="primary" @click="updatePassword">提交修改</el-button>
+          </el-form-item>
         </el-form>
-        </el-col>
+      </el-col>
     </el-row>
   </el-card>
 </template>
 
 <script setup>
 import { ref } from 'vue'
-import useUserInfoStore from '@/stores/userInfo.js'
-import { userInfoUpdateService } from '@/api/user.js'
 import { ElMessage } from 'element-plus'
+import { userPasswordUpdateService } from '@/api/user.js'
 
-const userInfoStore = useUserInfoStore();
-const userInfo = ref({ ...userInfoStore.info });
+const passwordFormRef = ref(null)
+const passwordForm = ref({
+  oldPassword: '',
+  newPassword: '',
+  confirmPassword: ''
+})
+
+const validatePass = (rule, value, callback) => {
+  if (value === '') {
+    callback(new Error('请输入密码'))
+  } else {
+    if (passwordForm.value.confirmPassword !== '') {
+      passwordFormRef.value?.validateField('confirmPassword')
+    }
+    callback()
+  }
+}
+
+const validatePass2 = (rule, value, callback) => {
+  if (value === '') {
+    callback(new Error('请再次输入密码'))
+  } else if (value !== passwordForm.value.newPassword) {
+    callback(new Error('两次输入密码不一致!'))
+  } else {
+    callback()
+  }
+}
 
 const rules = {
-  nickname: [
-    { required: true, message: '请输入用户昵称', trigger: 'blur' },
-    {
-      pattern: /^\S{2,10}$/,
-      message: '昵称必须是2-10位的非空字符串',
-      trigger: 'blur'
-    }
+  oldPassword: [
+    { required: true, message: '请输入原密码', trigger: 'blur' },
+    { min: 6, message: '密码长度不能小于6位', trigger: 'blur' }
   ],
-  email: [
-    { required: true, message: '请输入用户邮箱', trigger: 'blur' },
-    { type: 'email', message: '邮箱格式不正确', trigger: 'blur' }
+  newPassword: [
+    { required: true, validator: validatePass, trigger: 'blur' },
+    { min: 6, message: '密码长度不能小于6位', trigger: 'blur' }
+  ],
+  confirmPassword: [
+    { required: true, validator: validatePass2, trigger: 'blur' }
   ]
-};
+}
 
-// 修改个人信息
-const updateUserInfo = async () => {
-  const result = await userInfoUpdateService(userInfo.value);
-  ElMessage.success(result.msg ? result.msg : '修改成功');
-  userInfoStore.setInfo(userInfo.value);
-  window.location.reload();
+// 修改密码
+const updatePassword = async () => {
+  if (!passwordFormRef.value) return
+  
+  await passwordFormRef.value.validate(async (valid) => {
+    if (valid) {
+      try {
+        const result = await userPasswordUpdateService({
+          oldPassword: passwordForm.value.oldPassword,
+          newPassword: passwordForm.value.newPassword,
+          confirmPassword: passwordForm.value.confirmPassword
+        })
+        ElMessage.success(result.msg ? result.msg : '密码修改成功')
+        // 清空表单
+        passwordForm.value = {
+          oldPassword: '',
+          newPassword: '',
+          confirmPassword: ''
+        }
+      } catch (error) {
+        ElMessage.error(error.message || '密码修改失败')
+      }
+    }
+  })
 }
 </script>
 

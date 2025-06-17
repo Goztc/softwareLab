@@ -1,5 +1,5 @@
 <script setup>
-import { User, Lock } from '@element-plus/icons-vue'
+import { User, Lock, View, Hide } from '@element-plus/icons-vue'
 import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
 //控制注册与登录表单的显示， 默认显示注册
@@ -10,6 +10,10 @@ const registerData = ref({
     password: '',
     rePassword: ''
 })
+
+// 添加密码显示状态控制
+const showPassword = ref(false)
+const showRePassword = ref(false)
 
 //校验密码的函数
 const checkRePassword = (rule, value, callback) => {
@@ -126,12 +130,30 @@ const clearRegisterData = ()=>{
                     <el-input :prefix-icon="User" placeholder="请输入用户名" v-model="registerData.username"></el-input>
                 </el-form-item>
                 <el-form-item prop="password">
-                    <el-input :prefix-icon="Lock" type="password" placeholder="请输入密码"
-                        v-model="registerData.password"></el-input>
+                    <el-input 
+                        :prefix-icon="Lock" 
+                        :type="showPassword ? 'text' : 'password'" 
+                        placeholder="请输入密码"
+                        v-model="registerData.password">
+                        <template #suffix>
+                            <el-icon class="cursor-pointer" @click="showPassword = !showPassword">
+                                <component :is="showPassword ? View : Hide" />
+                            </el-icon>
+                        </template>
+                    </el-input>
                 </el-form-item>
                 <el-form-item prop="rePassword">
-                    <el-input :prefix-icon="Lock" type="password" placeholder="请输入再次密码"
-                        v-model="registerData.rePassword"></el-input>
+                    <el-input 
+                        :prefix-icon="Lock" 
+                        :type="showRePassword ? 'text' : 'password'" 
+                        placeholder="请输入再次密码"
+                        v-model="registerData.rePassword">
+                        <template #suffix>
+                            <el-icon class="cursor-pointer" @click="showRePassword = !showRePassword">
+                                <component :is="showRePassword ? View : Hide" />
+                            </el-icon>
+                        </template>
+                    </el-input>
                 </el-form-item>
                 <!-- 注册按钮 -->
                 <el-form-item>
@@ -154,7 +176,18 @@ const clearRegisterData = ()=>{
                     <el-input :prefix-icon="User" placeholder="请输入用户名" v-model="registerData.username"></el-input>
                 </el-form-item>
                 <el-form-item prop="password">
-                    <el-input name="password" :prefix-icon="Lock" type="password" placeholder="请输入密码" v-model="registerData.password"></el-input>
+                    <el-input 
+                        name="password" 
+                        :prefix-icon="Lock" 
+                        :type="showPassword ? 'text' : 'password'" 
+                        placeholder="请输入密码" 
+                        v-model="registerData.password">
+                        <template #suffix>
+                            <el-icon class="cursor-pointer" @click="showPassword = !showPassword">
+                                <component :is="showPassword ? View : Hide" />
+                            </el-icon>
+                        </template>
+                    </el-input>
                 </el-form-item>
                 <el-form-item class="flex">
                     <div class="flex">
@@ -206,6 +239,13 @@ const clearRegisterData = ()=>{
             width: 100%;
             display: flex;
             justify-content: space-between;
+        }
+
+        .cursor-pointer {
+            cursor: pointer;
+            &:hover {
+                color: var(--el-color-primary);
+            }
         }
     }
 }

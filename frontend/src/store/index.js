@@ -8,7 +8,6 @@ const store = createStore({
             visible: false,
         },
         visible: {
-            avatar: false,
             info: false,
             resetPassword: false,
             wenxin: false,
