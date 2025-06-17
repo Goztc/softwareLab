@@ -7,10 +7,16 @@ import com.itheima.pojo.Result;
 import com.itheima.service.FileService;
 import com.itheima.utils.ThreadLocalUtil;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
 /**
@@ -108,14 +114,24 @@ public class FileController {
     /**
      * 文件下载接口
      * @param fileId 要下载的文件ID
-     * @return 文件二进制流（实际实现需配合HttpServletResponse）
+     * @return 文件二进制流
      */
     @GetMapping("/{fileId}/download")
-    public Result<Void> downloadFile(@PathVariable Long fileId) throws IOException {
+    public ResponseEntity<Resource> downloadFile(@PathVariable Long fileId) throws IOException {
         Long userId = getCurrentUserId();
-
-        fileService.downloadFile(userId, fileId);
-        return Result.success();
+        File fileMeta = fileService.getFileMetadata(userId, fileId);
+        Resource resource = fileService.downloadFile(userId, fileId);
+    
+        String fileName = fileMeta.getFileName();
+        // 重点：对文件名进行编码，兼容中文和特殊字符
+        String encodedFileName = URLEncoder.encode(fileName, StandardCharsets.UTF_8).replaceAll("\\+", "%20");
+    
+        String contentDisposition = "attachment; filename*=UTF-8''" + encodedFileName;
+    
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition)
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .body(resource);
     }
 
     /**

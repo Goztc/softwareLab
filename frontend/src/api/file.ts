@@ -55,11 +55,10 @@ export const fileApi = {
      * 文件下载（处理为Blob）
      * @param fileId 文件ID
      */
-    download: async (fileId: number): Promise<Blob> => {
-        const response = await request.get(`/files/${fileId}/download`, {
+    download: async (fileId: number) => {
+        return request.get(`/files/${fileId}/download`, {
             responseType: 'blob'
         })
-        return response.data
     },
 
     /**

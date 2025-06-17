@@ -625,10 +625,12 @@ const getSelectedCount = () => {
 
 // 清空树形选择
 const clearTreeSelection = () => {
+  // 清空 el-tree 的勾选状态
   if (fileTreeRef.value) {
-    fileTreeRef.value.setCheckedKeys([])
+    fileTreeRef.value.setCheckedKeys([]);
   }
-  clearSelection()
+  // 清空已选文件和文件夹
+  clearSelection();
 }
 
 const enterFolder = async (folderId: number) => {
@@ -689,10 +691,11 @@ const removeSelectedFolder = (folderId: number) => {
 }
 
 const clearSelection = () => {
-  selectedFileIds.value.clear()
-  selectedFolderIds.value.clear()
-  selectedFiles.value = []
-  selectedFolders.value = []
+  selectedFileIds.value.clear();
+  selectedFolderIds.value.clear();
+  selectedFiles.value = [];
+  selectedFolders.value = [];
+  clearTreeSelection();
 }
 
 // 获取文件图标

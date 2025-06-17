@@ -43,13 +43,13 @@ import router from '@/router'  // '@/router' 将自动导入 `router/index.js` �
 instance.interceptors.response.use(
     // 成功响应的处理函数，当服务器返回状态码为 2xx 时会执行此函数
     response => {
-        // 判断业务状态码，假设服务器返回的数据结构中包含 code 字段
-        // 当 code 为 0 时，表示业务处理成功
+        // 针对文件下载（blob），直接返回原始 response
+        if (response.config.responseType === 'blob') {
+            return response;
+        }
         if (response.data.code === 0) {
-            // 业务处理成功，直接返回响应数据中的 data 部分
             return response.data;
         }
-
         // 当业务状态码不为 0 时，表示操作失败
         // 使用 ElMessage 组件显示错误信息，优先使用服务器返回的 msg 字段
         // 如果 msg 字段不存在，则显示默认的错误信息 '服务异常'

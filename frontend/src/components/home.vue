@@ -185,12 +185,8 @@ const handleCommand = (command)=>{
                 message: '用户取消了退出登录',
             })
         })
-    }else if(command === 'info'){
-        ElMessage({
-            type: 'success',
-            message: 'info',
-        })
-        store.commit('changeVisibility', { info: !visiblecontrol.value.info });
+    }else if(command === 'home'){
+        router.push('/home');
     }
 }
 </script>
@@ -237,7 +233,7 @@ const handleCommand = (command)=>{
               </li>
               <template #dropdown>
                 <el-dropdown-menu>
-                  <el-dropdown-item command="info" :icon="User">修改密码</el-dropdown-item>
+                  <el-dropdown-item command="home" :icon="User">个人信息</el-dropdown-item>
                   <el-dropdown-item command="logout" :icon="SwitchButton">退出登录</el-dropdown-item>
                 </el-dropdown-menu>
               </template>

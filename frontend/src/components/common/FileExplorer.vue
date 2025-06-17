@@ -532,9 +532,56 @@ const deleteFolder = async (folderId: number) => {
 }
 
 // 下载文件
-const downloadFile = (file: MyFile) => {
-  ElMessage.success(`开始下载: ${file.fileName}`)
-  // 这里添加实际下载逻辑
+const downloadFile = async (file: MyFile) => {
+  try {
+    ElMessage.info(`正在下载: ${file.fileName}`);
+    const response = await fileApi.download(file.id);
+    const blob = response.data;
+
+    // 1. 判断是否为后端错误信息（如JSON）
+    if (blob.type && blob.type.indexOf('application/json') !== -1) {
+      const text = await blob.text();
+      let msg = '下载失败';
+      try {
+        const json = JSON.parse(text);
+        msg = json.message || json.msg || msg;
+      } catch (e) {
+        msg = text;
+      }
+      ElMessage.error(msg);
+      return;
+    }
+
+    // 2. 获取文件名
+    let fileName = file.fileName;
+    const disposition = response.headers['content-disposition'];
+    if (disposition) {
+      // 兼容 filename*=UTF-8'' 以及 filename=
+      let match = disposition.match(/filename\\*=UTF-8''(.+)/);
+      if (match && match[1]) {
+        fileName = decodeURIComponent(match[1]);
+      } else {
+        match = disposition.match(/filename=\"?([^\";]+)\"?/);
+        if (match && match[1]) {
+          fileName = decodeURIComponent(match[1]);
+        }
+      }
+    }
+
+    // 3. 创建下载链接
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+    ElMessage.success('文件下载成功');
+  } catch (error) {
+    console.error('下载文件失败:', error);
+    ElMessage.error(`文件下载失败: ${error instanceof Error ? error.message : String(error)}`);
+  }
 }
 
 // 重命名项目

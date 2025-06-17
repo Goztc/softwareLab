@@ -57,7 +57,6 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
-import myFooter from '@/components/common/myFooter.vue';
 import loader from '@/components/common/loader.vue';
 import zombie from '@/components/common/zombie.vue';
 import bgImage from '@/assets/bgimg.png';
@@ -74,14 +73,15 @@ const store = useStore();                                 // 5-30
 const visible = computed(() => store.state.visible);      // 5-30
 
 // 模拟 webTitle 数据
-const webTitle = ref('hhhhhhhhhh'.split(''));
+const webTitle = ref('RAG 智能对话助手'.split(''));
 // printerInfo 数据
 const printerInfo = ref({
-  content: '幸福快乐每一天'
+  content: '你的不二选择~'
 });
 // 在组件挂载时调用函数
 onMounted(() => {
   //初始化
+  store.commit('changeVisibility', { info: true });
 });
 const filesInfo = ref([
   {
